@@ -1,9 +1,14 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import configuration from './config/configuration';
 import { validateEnv } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
-import { HealthModule } from './health/health.module';
+import { AuthModule } from './domain/auth/auth.module';
+import { JwtAuthGuard } from './domain/auth/guards/jwt-auth.guard';
+import { RolesGuard } from './domain/auth/guards/roles.guard';
+import { MoviesModule } from './domain/movies/movies.module';
+import { SyncModule } from './domain/sync/sync.module';
 import { TraceIdMiddleware } from './common/middleware/trace-id.middleware';
 
 @Module({
@@ -15,12 +20,16 @@ import { TraceIdMiddleware } from './common/middleware/trace-id.middleware';
       cache: true,
     }),
     DatabaseModule,
-    HealthModule,
+    AuthModule,
+    MoviesModule,
+    SyncModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })
 export class AppModule implements NestModule {
-  // El middleware de traceId corre antes que cualquier handler para que el
-  // `HttpExceptionFilter` pueda leer el mismo ID cuando normaliza errores.
   configure(consumer: MiddlewareConsumer): void {
     consumer.apply(TraceIdMiddleware).forRoutes('*');
   }

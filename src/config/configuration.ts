@@ -15,17 +15,12 @@ export interface BcryptConfig {
   cost: number;
 }
 
-export interface CorsConfig {
-  origins: string[];
-}
-
 export interface AppConfig {
   port: number;
   nodeEnv: string;
   database: DatabaseConfig;
   jwt: JwtConfig;
   bcrypt: BcryptConfig;
-  cors: CorsConfig;
 }
 
 const DEFAULT_PORT = 3000;
@@ -33,12 +28,6 @@ const DEFAULT_DATABASE_PORT = 5432;
 const DEFAULT_JWT_TTL_SECONDS = 3600;
 const DEFAULT_BCRYPT_COST = 10;
 
-/**
- * Lanza error explicito si la env no esta presente. Se usa para secretos
- * y credenciales que no deben tener defaults inseguros: dejar que la app
- * arranque con `JWT_SECRET=change-me` o `DATABASE_PASSWORD=postgres` es
- * un footgun que el linter no detecta.
- */
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (value === undefined || value === '') {
@@ -55,26 +44,7 @@ function parseInteger(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function parseOrigins(value: string | undefined): string[] {
-  if (value === undefined || value === '') {
-    return [];
-  }
-  return value
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter((origin) => origin.length > 0);
-}
-
-/**
- * Lee las variables de entorno y devuelve la configuracion tipada del proyecto.
- * Falla rapido (throw) si falta `JWT_SECRET` o `DATABASE_PASSWORD`: el contrato
- * del proyecto no admite defaults inseguros para credenciales.
- * La validacion adicional (longitudes, blacklist, reglas de produccion) se hace
- * en `validateEnv` (env.validation.ts).
- */
 export default function configuration(): AppConfig {
-  const corsOrigins = parseOrigins(process.env.CORS_ORIGINS);
-
   return {
     port: parseInteger(process.env.PORT, DEFAULT_PORT),
     nodeEnv: process.env.NODE_ENV ?? 'development',
@@ -91,9 +61,6 @@ export default function configuration(): AppConfig {
     },
     bcrypt: {
       cost: parseInteger(process.env.BCRYPT_COST, DEFAULT_BCRYPT_COST),
-    },
-    cors: {
-      origins: corsOrigins,
     },
   };
 }

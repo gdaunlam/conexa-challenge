@@ -9,8 +9,6 @@ describe('configuration factory', () => {
   };
 
   beforeEach(() => {
-    // Limpiamos NODE_ENV (Jest lo setea en `test`) para que la primera asercion
-    // (que asume `nodeEnv: 'development'`) no se rompa.
     const envWithoutNodeEnv = { ...originalEnv };
     delete envWithoutNodeEnv.NODE_ENV;
     process.env = { ...envWithoutNodeEnv, ...requiredEnv };
@@ -39,9 +37,6 @@ describe('configuration factory', () => {
       },
       bcrypt: {
         cost: 10,
-      },
-      cors: {
-        origins: [],
       },
     });
   });
@@ -81,22 +76,6 @@ describe('configuration factory', () => {
     expect(config.port).toBe(3000);
   });
 
-  it('parses CORS_ORIGINS as a CSV of trimmed origins', () => {
-    process.env.CORS_ORIGINS = 'https://app.example.com, https://admin.example.com ,';
-
-    const config = configuration();
-
-    expect(config.cors.origins).toEqual(['https://app.example.com', 'https://admin.example.com']);
-  });
-
-  it('returns an empty CORS origins list when CORS_ORIGINS is not set', () => {
-    delete process.env.CORS_ORIGINS;
-
-    const config = configuration();
-
-    expect(config.cors.origins).toEqual([]);
-  });
-
   it('throws when JWT_SECRET is missing', () => {
     delete process.env.JWT_SECRET;
 
@@ -110,9 +89,6 @@ describe('configuration factory', () => {
   });
 
   it('treats an empty JWT_SECRET as missing (B2: string vacio)', () => {
-    // Un `.env` mal editado deja la linea con valor vacio. El loader lo trata
-    // igual que ausente para que el operador no termine booteando con secret
-    // explicito en blanco.
     process.env.JWT_SECRET = '';
 
     expect(() => configuration()).toThrow('JWT_SECRET');

@@ -375,7 +375,7 @@ El campo `attributes` es un JSONB con shape `{characters: string[], planets: str
 
 ## 5. Health (`/api/v1/health`)
 
-### `GET /health` — Healthcheck
+### `GET /api/v1/health` — Healthcheck
 - **Acceso:** público
 - **Status codes:** `200`, `503`
 

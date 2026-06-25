@@ -1,4 +1,15 @@
 pending
+    Postman collection
+    README.md final
+        aclara como usar la aplicacion
+        indica como abrir swagger
+        aclara donde estan los archivos adjuntos (postman collection, docs)
+        nombra desiciones o contemplaciones especificas especiales, ej cosas
+        dejadas de lado, hechas diferentes por motivos de tiempo o prioridades, o desiciones tomadas por falta de claridad en los requerimientos
+    nth
+        Tests e2e con supertest
+in progress
+done
     dominio
         Implementacion de
             endpoints
@@ -7,33 +18,16 @@ pending
             responses
             dtos
             entities
-        Postman collection
-        Swagger
-        Tests unitarios
-        Autenticacion JWT
-        Autorizacion
-            Roles
-            Permisos
-    nth
-        Tests e2e con supertest
-        Logging + trace_id
-in progress
+    Swagger
+    Tests unitarios
+    Autenticacion JWT
+    Autorizacion
+        Roles
+        Permisos
     estructura
         Base de datos
             TypeORM
             Migraciones
-                Migrations en produccion
-                    Estrategia: migrationsRun=false en runtime + pnpm migration:run como
-                        step pre-deploy en CI/CD.
-                    Razon: single instance (no multi-replica) es el scope del proyecto.
-                        TypeORM no provee lock distribuido built-in (no leader election,
-                        no pg_try_advisory_lock). Si se olvida el step pre-deploy, la app
-                        bootea con schema desactualizado.
-                    Si el deploy se vuelve N replicas en el futuro, migrar a
-                        pg_try_advisory_lock wrapper o initContainer k8s.
-                    Aplicado en src/database/database.module.ts (buildTypeOrmOptions) y
-                        src/database/data-source.ts. Comandos pnpm: migration:run y
-                        migration:revert operativos; Init migration es no-op idempotente.
         classValidator
         Husky
         Environment variables
@@ -63,7 +57,8 @@ in progress
                 pipes (si se necesita)
                 filters (si se necesita)
                 utils (si se necesita)
-done
+    nth
+        Logging + trace_id
     docs
         Endpoints de la API
             Validaciones
