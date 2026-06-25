@@ -1,8 +1,17 @@
-import { ArgumentsHost, BadRequestException, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { HttpExceptionFilter } from './http-exception.filter';
 
-const UUID_V4_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 describe('HttpExceptionFilter', () => {
   let filter: HttpExceptionFilter;
@@ -10,6 +19,7 @@ describe('HttpExceptionFilter', () => {
   let mockRequest: { method: string; path: string; url: string; traceId?: string };
   let mockHost: ArgumentsHost;
   let errorSpy: jest.SpyInstance;
+  let warnSpy: jest.SpyInstance;
 
   const buildMocks = (traceId?: string): void => {
     mockResponse = {
@@ -31,15 +41,15 @@ describe('HttpExceptionFilter', () => {
 
   beforeEach(() => {
     filter = new HttpExceptionFilter();
-    // Capturamos las llamadas a Logger.error para verificar que el log NO
-    // incluya la query string (PII potential leak). El filter usa `request.path`,
-    // no `request.url`, asi que aunque el request traiga `?email=foo&token=bar`,
-    // el log solo debe tener `/path`.
+
     errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+
+    warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     errorSpy.mockRestore();
+    warnSpy.mockRestore();
   });
 
   it('normalizes an HttpException with a string message', () => {
@@ -66,9 +76,7 @@ describe('HttpExceptionFilter', () => {
     const exception = new BadRequestException({
       error: 'Bad Request',
       message: 'Validation failed',
-      details: [
-        { field: 'email', constraints: { isEmail: 'email must be a valid email' } },
-      ],
+      details: [{ field: 'email', constraints: { isEmail: 'email must be a valid email' } }],
     });
 
     filter.catch(exception, mockHost);
@@ -79,9 +87,7 @@ describe('HttpExceptionFilter', () => {
         statusCode: HttpStatus.BAD_REQUEST,
         error: 'Bad Request',
         message: 'Validation failed',
-        details: [
-          { field: 'email', constraints: { isEmail: 'email must be a valid email' } },
-        ],
+        details: [{ field: 'email', constraints: { isEmail: 'email must be a valid email' } }],
         traceId: expect.any(String),
         timestamp: expect.any(String),
       }),
@@ -139,10 +145,6 @@ describe('HttpExceptionFilter', () => {
   });
 
   it('logs the request path, not the full url (WARNING #1: avoid leaking query-string PII)', () => {
-    // Simula un request real con query string sensible. El log tiene que
-    // mostrar el path pelado, no la URL completa. Si alguien futuro restaura
-    // `request.url` en el logger, este test rompe: el log pasaria a incluir
-    // `?email=foo&token=bar`, que es exactamente lo que queremos evitar.
     buildMocks();
     mockRequest.url = '/movies?email=foo@example.com&token=hunter2&password=secret';
     mockRequest.path = '/movies';
@@ -150,11 +152,56 @@ describe('HttpExceptionFilter', () => {
 
     filter.catch(exception, mockHost);
 
-    expect(errorSpy).toHaveBeenCalledTimes(1);
-    const logged = errorSpy.mock.calls[0]?.[0] as string;
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const logged = warnSpy.mock.calls[0]?.[0] as string;
     expect(logged).toContain('GET /movies ->');
     expect(logged).not.toContain('email=');
     expect(logged).not.toContain('token=');
     expect(logged).not.toContain('password=');
+  });
+
+  describe('log level: 4xx vs 5xx (WARNING #3: avoid contaminating ERROR channel)', () => {
+    it('logs 400 Bad Request as warn (not error)', () => {
+      buildMocks();
+      filter.catch(new BadRequestException('Validation failed'), mockHost);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
+
+    it('logs 401 Unauthorized as warn (credential failures are expected, not server errors)', () => {
+      buildMocks();
+      filter.catch(new UnauthorizedException('Invalid credentials'), mockHost);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
+
+    it('logs 403 Forbidden as warn', () => {
+      buildMocks();
+      filter.catch(new ForbiddenException('Insufficient permissions'), mockHost);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
+
+    it('logs 404 Not Found as warn', () => {
+      buildMocks();
+      filter.catch(new NotFoundException('Resource not found'), mockHost);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
+
+    it('logs 500 Internal Server Error as error (genuine server-side failure)', () => {
+      buildMocks();
+      filter.catch(new Error('boom'), mockHost);
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('logs 503 Service Unavailable as error (genuine server-side failure)', () => {
+      buildMocks();
+      filter.catch(new ServiceUnavailableException('Database connection not available'), mockHost);
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
   });
 });

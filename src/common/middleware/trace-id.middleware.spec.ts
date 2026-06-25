@@ -51,12 +51,6 @@ describe('TraceIdMiddleware', () => {
   });
 
   it('produces a traceId that HttpExceptionFilter can read back as-is (B4: end-to-end correlation)', () => {
-    // B4: el contrato de DOCS/ENDPOINTS.md seccion 6 es que un mismo request
-    // tiene un unico traceId visible en el response header Y en el body del
-    // error. Esto prueba el "puente" entre las dos piezas sin levantar Nest:
-    // el middleware setea el header + req.traceId, el filter lee req.traceId
-    // y lo emite en el body. Si alguien futuro rompe el contrato (e.g. el
-    // filter empieza a generar uno nuevo en vez de reusar), este test rompe.
     middleware.use(mockRequest, mockResponse as unknown as Response, nextMock);
 
     const setHeaderCall = mockResponse.setHeader.mock.calls.find(
@@ -65,8 +59,6 @@ describe('TraceIdMiddleware', () => {
     const headerTraceId = setHeaderCall?.[1] as string;
     expect(mockRequest.traceId).toBe(headerTraceId);
 
-    // Reusar el traceId del middleware como input del filter (mismo shape que
-    // un request real) y verificar que el body del error lo contiene verbatim.
     const filter = new HttpExceptionFilter();
     const filterRequest = { ...mockRequest, method: 'GET', path: '/movies', url: '/movies' };
     const filterResponse = {

@@ -24,12 +24,6 @@ describe('BaseEntity', () => {
   });
 
   it('registers deletedAt as a nullable delete-date column', () => {
-    // El campo `deletedAt` admite `null` (fila activa) o `Date` (fila soft-deleted).
-    // La invariante se valida contra los argumentos de metadata de TypeORM:
-    // el decorador `@DeleteDateColumn({ nullable: true })` registra la columna
-    // con `mode === 'deleteDate'` y `options.nullable === true`.
-    // Como la declaracion vive en `BaseEntity`, `target` es la propia clase
-    // abstracta (TypeORM no re-registra la columna en cada subclase).
     const deletedAtColumn = getMetadataArgsStorage().columns.find(
       (column) => column.propertyName === 'deletedAt' && column.mode === 'deleteDate',
     );
@@ -39,9 +33,6 @@ describe('BaseEntity', () => {
   });
 
   it('registers createdAt and updatedAt as timestamp columns managed by TypeORM', () => {
-    // `createdAt` y `updatedAt` son columnas de timestamp que TypeORM mantiene
-    // automaticamente: `@CreateDateColumn` y `@UpdateDateColumn` registran
-    // metadata con `mode` igual a `'createDate'` y `'updateDate'`.
     const createdAtColumn = getMetadataArgsStorage().columns.find(
       (column) => column.propertyName === 'createdAt' && column.mode === 'createDate',
     );

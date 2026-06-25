@@ -24,13 +24,6 @@ export interface ErrorResponseBody {
   timestamp: string;
 }
 
-/**
- * Filtro global que normaliza el shape de las respuestas de error HTTP.
- * Implementa la convencion definida en DOCS/ENDPOINTS.md seccion 6.
- * El `traceId` lo provee `TraceIdMiddleware` (un UUID v4 unico por request);
- * este filter solo lo reusa. Si por algun motivo el middleware no corrio
- * (p.ej. tests unitarios del filter), se genera uno nuevo como fallback.
- */
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
@@ -54,9 +47,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
       timestamp,
     };
 
-    this.logger.error(
-      `[${traceId}] ${request.method} ${request.path} -> ${statusCode} ${error}: ${message}`,
-    );
+    const logMessage = `[${traceId}] ${request.method} ${request.path} -> ${statusCode} ${error}: ${message}`;
+    if (statusCode >= 500) {
+      this.logger.error(logMessage);
+    } else {
+      this.logger.warn(logMessage);
+    }
 
     response.status(statusCode).json(body);
   }
@@ -95,17 +91,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
         const rawDetails = responseObj['details'];
 
         const message =
-          typeof rawMessage === 'string' && rawMessage.length > 0
-            ? rawMessage
-            : exception.message;
+          typeof rawMessage === 'string' && rawMessage.length > 0 ? rawMessage : exception.message;
         const error = typeof rawError === 'string' && rawError.length > 0 ? rawError : errorName;
 
         let details: ErrorDetail[] | null = null;
         if (Array.isArray(rawDetails)) {
           details = rawDetails.filter(this.isErrorDetail);
         } else if (Array.isArray(rawMessage)) {
-          // Compatibilidad: si llega el array de strings por defecto del ValidationPipe,
-          // lo convertimos al shape [{ field, constraints: {} }].
           details = rawMessage
             .filter((item): item is string => typeof item === 'string')
             .map((item) => ({ field: item, constraints: {} }));

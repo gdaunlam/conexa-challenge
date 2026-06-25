@@ -1,13 +1,13 @@
 pending
     Postman collection
+    agregar endpoints en swagger
+    ver si el trace id recibe y emite el mismo trace
     README.md final
         aclara como usar la aplicacion
         indica como abrir swagger
         aclara donde estan los archivos adjuntos (postman collection, docs)
         nombra desiciones o contemplaciones especificas especiales, ej cosas
         dejadas de lado, hechas diferentes por motivos de tiempo o prioridades, o desiciones tomadas por falta de claridad en los requerimientos
-    nth
-        Tests e2e con supertest
 in progress
 done
     dominio
@@ -59,6 +59,7 @@ done
                 utils (si se necesita)
     nth
         Logging + trace_id
+        Tests e2e con supertest
     docs
         Endpoints de la API
             Validaciones
