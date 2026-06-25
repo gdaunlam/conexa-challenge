@@ -23,10 +23,8 @@ describe('validateEnv', () => {
     DATABASE_PASSWORD: 'Xq-3fP9kL2mZ8sV4nQ7wR',
   };
 
-  const expectRejected = async (
-    rawConfig: Record<string, unknown> = process.env,
-  ): Promise<void> => {
-    await expect(validateEnv(rawConfig)).rejects.toBeDefined();
+  const expectRejected = (rawConfig: Record<string, unknown> = process.env): void => {
+    expect(() => validateEnv(rawConfig)).toThrow();
   };
 
   beforeEach(() => {
@@ -37,67 +35,67 @@ describe('validateEnv', () => {
     process.env = originalEnv;
   });
 
-  it('accepts a valid development environment and returns the rawConfig unchanged', async () => {
+  it('accepts a valid development environment and returns the rawConfig unchanged', () => {
     const rawConfig = { ...process.env };
-    await expect(validateEnv(rawConfig)).resolves.toEqual(rawConfig);
+    expect(validateEnv(rawConfig)).toEqual(rawConfig);
   });
 
-  it('treats NODE_ENV=test as development (no production hardening)', async () => {
+  it('treats NODE_ENV=test as development (no production hardening)', () => {
     process.env.NODE_ENV = NodeEnv.Test;
     process.env.JWT_SECRET = 'sixteen-chars-ok!!';
     process.env.DATABASE_PASSWORD = 'short';
 
-    await expect(validateEnv(process.env)).resolves.toBeDefined();
+    expect(validateEnv(process.env)).toBeDefined();
   });
 
-  it('rejects PORT outside the valid range', async () => {
+  it('rejects PORT outside the valid range', () => {
     process.env.PORT = '99999';
-    await expectRejected();
+    expectRejected();
   });
 
-  it('rejects JWT_SECRET shorter than 16 chars', async () => {
+  it('rejects JWT_SECRET shorter than 16 chars', () => {
     process.env.JWT_SECRET = 'too-short';
-    await expectRejected();
+    expectRejected();
   });
 
-  it('rejects missing JWT_SECRET', async () => {
+  it('rejects missing JWT_SECRET', () => {
     delete process.env.JWT_SECRET;
-    await expectRejected();
+    expectRejected();
   });
 
-  it('rejects missing DATABASE_PASSWORD', async () => {
+  it('rejects missing DATABASE_PASSWORD', () => {
     delete process.env.DATABASE_PASSWORD;
-    await expectRejected();
+    expectRejected();
   });
 
-  it('rejects empty DATABASE_PASSWORD', async () => {
+  it('rejects empty DATABASE_PASSWORD', () => {
     process.env.DATABASE_PASSWORD = '';
-    await expectRejected();
+    expectRejected();
   });
 
-  it('rejects empty JWT_SECRET', async () => {
+  it('rejects empty JWT_SECRET', () => {
     process.env.JWT_SECRET = '';
-    await expectRejected();
+    expectRejected();
   });
 
-  it('rejects BCRYPT_COST above 15', async () => {
+  it('rejects BCRYPT_COST above 15', () => {
     process.env.BCRYPT_COST = '20';
-    await expectRejected();
+    expectRejected();
   });
 
-  it('rejects BCRYPT_COST below 4', async () => {
+  it('rejects BCRYPT_COST below 4', () => {
     process.env.BCRYPT_COST = '2';
-    await expectRejected();
+    expectRejected();
   });
 
-  it('rejects invalid NODE_ENV value', async () => {
+  it('rejects invalid NODE_ENV value', () => {
     process.env.NODE_ENV = 'staging';
-    await expectRejected();
+    expectRejected();
   });
 
-  it('rejects an empty DATABASE_HOST', async () => {
+  it('rejects an empty DATABASE_HOST', () => {
     process.env.DATABASE_HOST = '';
-    await expectRejected();
+    expectRejected();
   });
 
   describe('production hardening', () => {
@@ -105,74 +103,74 @@ describe('validateEnv', () => {
       process.env = { ...originalEnv, ...validProdEnv };
     });
 
-    it('accepts a fully hardened production environment', async () => {
+    it('accepts a fully hardened production environment', () => {
       const rawConfig = { ...process.env };
-      await expect(validateEnv(rawConfig)).resolves.toEqual(rawConfig);
+      expect(validateEnv(rawConfig)).toEqual(rawConfig);
     });
 
-    it('rejects a production environment with a JWT_SECRET shorter than 32 chars', async () => {
+    it('rejects a production environment with a JWT_SECRET shorter than 32 chars', () => {
       process.env.JWT_SECRET = 'sixteen-chars-ok!!';
-      await expect(validateEnv(process.env)).rejects.toThrow(/JWT_SECRET/);
+      expect(() => validateEnv(process.env)).toThrow(/JWT_SECRET/);
     });
 
-    it('rejects a production environment with a DATABASE_PASSWORD shorter than 12 chars', async () => {
+    it('rejects a production environment with a DATABASE_PASSWORD shorter than 12 chars', () => {
       process.env.DATABASE_PASSWORD = 'short';
-      await expect(validateEnv(process.env)).rejects.toThrow(/DATABASE_PASSWORD/);
+      expect(() => validateEnv(process.env)).toThrow(/DATABASE_PASSWORD/);
     });
 
-    it('rejects a production environment with a trivial DATABASE_PASSWORD (contains "postgres")', async () => {
+    it('rejects a production environment with a trivial DATABASE_PASSWORD (contains "postgres")', () => {
       process.env.DATABASE_PASSWORD = 'postgres-1234567890ab';
-      await expect(validateEnv(process.env)).rejects.toThrow(/DATABASE_PASSWORD/);
+      expect(() => validateEnv(process.env)).toThrow(/DATABASE_PASSWORD/);
     });
 
-    it('rejects a production environment with a trivial DATABASE_PASSWORD (contains "password")', async () => {
+    it('rejects a production environment with a trivial DATABASE_PASSWORD (contains "password")', () => {
       process.env.DATABASE_PASSWORD = 'strong-but-contains-password-1234';
-      await expect(validateEnv(process.env)).rejects.toThrow(/DATABASE_PASSWORD/);
+      expect(() => validateEnv(process.env)).toThrow(/DATABASE_PASSWORD/);
     });
 
-    it('rejects a production environment with a trivial DATABASE_PASSWORD (contains "changeme")', async () => {
+    it('rejects a production environment with a trivial DATABASE_PASSWORD (contains "changeme")', () => {
       process.env.DATABASE_PASSWORD = 'changeme-but-32-chars-padding-1234';
-      await expect(validateEnv(process.env)).rejects.toThrow(/DATABASE_PASSWORD/);
+      expect(() => validateEnv(process.env)).toThrow(/DATABASE_PASSWORD/);
     });
 
-    it('rejects a production environment with a trivial DATABASE_PASSWORD (contains "secret")', async () => {
+    it('rejects a production environment with a trivial DATABASE_PASSWORD (contains "secret")', () => {
       process.env.DATABASE_PASSWORD = 'a-secret-password-1234567890ab';
-      await expect(validateEnv(process.env)).rejects.toThrow(/DATABASE_PASSWORD/);
+      expect(() => validateEnv(process.env)).toThrow(/DATABASE_PASSWORD/);
     });
 
-    it('rejects a production environment with a trivial DATABASE_PASSWORD (contains "admin")', async () => {
+    it('rejects a production environment with a trivial DATABASE_PASSWORD (contains "admin")', () => {
       process.env.DATABASE_PASSWORD = 'admin1234567890ab';
-      await expect(validateEnv(process.env)).rejects.toThrow(/DATABASE_PASSWORD/);
+      expect(() => validateEnv(process.env)).toThrow(/DATABASE_PASSWORD/);
     });
 
-    it('rejects a production environment with BCRYPT_COST < 10 (WARNING #2: cost min hardening)', async () => {
+    it('rejects a production environment with BCRYPT_COST < 10 (WARNING #2: cost min hardening)', () => {
       process.env.BCRYPT_COST = '4';
-      await expect(validateEnv(process.env)).rejects.toThrow(/BCRYPT_COST.*at least 10/);
+      expect(() => validateEnv(process.env)).toThrow(/BCRYPT_COST.*at least 10/);
     });
 
-    it('accepts BCRYPT_COST=10 in production (boundary)', async () => {
+    it('accepts BCRYPT_COST=10 in production (boundary)', () => {
       process.env.BCRYPT_COST = '10';
-      await expect(validateEnv(process.env)).resolves.toBeDefined();
+      expect(validateEnv(process.env)).toBeDefined();
     });
 
-    it('accepts BCRYPT_COST=4 in development (no production hardening applies)', async () => {
+    it('accepts BCRYPT_COST=4 in development (no production hardening applies)', () => {
       process.env = { ...originalEnv, ...validDevEnv };
       process.env.BCRYPT_COST = '4';
-      await expect(validateEnv(process.env)).resolves.toBeDefined();
+      expect(validateEnv(process.env)).toBeDefined();
     });
   });
 
   describe('argument-vs-process.env isolation', () => {
-    it('reads from the rawConfig argument, not from process.env', async () => {
+    it('reads from the rawConfig argument, not from process.env', () => {
       process.env.NODE_ENV = NodeEnv.Production;
       process.env.JWT_SECRET = 'way-too-short';
       process.env.DATABASE_PASSWORD = 'postgres1234567890ab';
 
       const rawConfig = { ...validProdEnv };
-      await expect(validateEnv(rawConfig)).resolves.toBeDefined();
+      expect(validateEnv(rawConfig)).toBeDefined();
     });
 
-    it('rejects when the rawConfig argument has bad values even if process.env is clean', async () => {
+    it('rejects when the rawConfig argument has bad values even if process.env is clean', () => {
       process.env = { ...originalEnv, ...validDevEnv };
 
       const badRawConfig = {
@@ -188,7 +186,7 @@ describe('validateEnv', () => {
         BCRYPT_COST: 10,
       };
 
-      await expect(validateEnv(badRawConfig)).rejects.toThrow(/DATABASE_PASSWORD/);
+      expect(() => validateEnv(badRawConfig)).toThrow(/DATABASE_PASSWORD/);
     });
   });
 });
