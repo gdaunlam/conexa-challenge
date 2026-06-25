@@ -103,7 +103,7 @@ export class MoviesController {
   @ApiResponse({ status: 400, description: 'id invalido (debe ser entero positivo).' })
   @ApiResponse({ status: 401, description: 'No autenticado.' })
   @ApiResponse({ status: 404, description: 'Pelicula no existe o esta soft-deleted.' })
-  findOne(@Param('id') rawId: string): Promise<MovieResponseDto> {
+  async findOne(@Param('id') rawId: string): Promise<MovieResponseDto> {
     const id = parsePositiveId(rawId);
     return this.moviesService.findOne(id);
   }
@@ -144,7 +144,7 @@ export class MoviesController {
   @ApiResponse({ status: 401, description: 'No autenticado.' })
   @ApiResponse({ status: 403, description: 'No es admin.' })
   @ApiResponse({ status: 404, description: 'Pelicula no existe o esta soft-deleted.' })
-  update(
+  async update(
     @Param('id') rawId: string,
     @Body() dto: UpdateMovieDto,
   ): Promise<MovieResponseDto> {
