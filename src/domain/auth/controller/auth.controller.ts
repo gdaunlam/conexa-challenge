@@ -29,6 +29,10 @@ export class AuthController {
   @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, description: 'Authentication succeeded.', type: LoginResponseDto })
   @ApiResponse({
+    status: 400,
+    description: 'Validacion fallida (email formato invalido, password vacio).',
+  })
+  @ApiResponse({
     status: 401,
     description: 'Invalid credentials (email not found, wrong password, or account disabled).',
   })

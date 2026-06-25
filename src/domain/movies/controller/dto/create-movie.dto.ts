@@ -7,6 +7,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  Length,
   Max,
   MaxLength,
   Min,
@@ -19,6 +20,7 @@ const MAX_DIRECTOR_LENGTH = 100;
 const MAX_PRODUCER_LENGTH = 200;
 const MAX_OPENING_CRAWL_LENGTH = 5000;
 const MAX_EXTERNAL_ID_LENGTH = 100;
+const RELEASE_DATE_LENGTH = 10;
 
 export class CreateMovieDto {
   @ApiProperty({
@@ -52,11 +54,14 @@ export class CreateMovieDto {
   producer!: string;
 
   @ApiProperty({
-    description: 'Fecha de estreno en formato ISO 8601 (`YYYY-MM-DD`). Requerido.',
+    description: 'Fecha de estreno en formato ISO 8601 estricto (`YYYY-MM-DD`, exactamente 10 chars). Requerido.',
     example: RELEASE_DATE_FORMAT_EXAMPLE,
     format: 'date',
+    minLength: 10,
+    maxLength: 10,
   })
   @IsDateString()
+  @Length(RELEASE_DATE_LENGTH, RELEASE_DATE_LENGTH)
   releaseDate!: string;
 
   @ApiProperty({
@@ -93,6 +98,7 @@ export class CreateMovieDto {
     example: '1',
     required: false,
     nullable: true,
+    minLength: 1,
     maxLength: MAX_EXTERNAL_ID_LENGTH,
   })
   @IsOptional()

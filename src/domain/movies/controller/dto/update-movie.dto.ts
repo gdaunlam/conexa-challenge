@@ -56,9 +56,11 @@ export class UpdateMovieDto {
 
   @ApiProperty({
     description:
-      'Fecha de estreno ISO 8601 estricto (`YYYY-MM-DD`, 10 chars). `null` o `""` = 400 (NOT NULL). Ausencia = no modificar.',
+      'Fecha de estreno ISO 8601 estricto (`YYYY-MM-DD`, exactamente 10 chars). `null` o `""` = 400 (NOT NULL). Ausencia = no modificar.',
     required: false,
     format: 'date',
+    minLength: 10,
+    maxLength: 10,
   })
   @ValidateIf((o) => o.releaseDate !== undefined)
   @IsDateString()

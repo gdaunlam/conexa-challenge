@@ -20,7 +20,7 @@ export const buildTypeOrmOptions = (configService: ConfigService): TypeOrmModule
   synchronize: false,
 
   migrations: [MIGRATIONS_GLOB],
-  migrationsRun: false,
+  migrationsRun: true,
 
   connectTimeoutMS: TYPEORM_CONNECT_TIMEOUT_MS,
   extra: {

@@ -20,8 +20,8 @@ export class MovieResponseDto {
   @ApiProperty({ example: 'Gary Kurtz, Rick McCallum' })
   producer!: string;
 
-  @ApiProperty({ example: '1977-05-25', nullable: true, required: false, format: 'date' })
-  releaseDate!: string | null;
+  @ApiProperty({ example: '1977-05-25', format: 'date' })
+  releaseDate!: string;
 
   @ApiProperty({ enum: ['manual', 'swapi'], example: 'manual' })
   provider!: MovieProvider;

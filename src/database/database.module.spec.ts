@@ -36,7 +36,7 @@ describe('DatabaseModule', () => {
         autoLoadEntities: true,
         synchronize: false,
         migrations: expect.arrayContaining([expect.stringContaining('migrations')]),
-        migrationsRun: false,
+        migrationsRun: true,
         connectTimeoutMS: 5000,
         extra: {
           statement_timeout: 5000,
@@ -54,9 +54,9 @@ describe('DatabaseModule', () => {
       expect(entries.some((entry) => entry.includes('migrations'))).toBe(true);
     });
 
-    it('disables migrationsRun so CI/CD controls the migration lifecycle', () => {
+    it('runs pending migrations on bootstrap so the tester does not need to invoke them manually', () => {
       const options = buildTypeOrmOptions(buildMockConfigService());
-      expect(options.migrationsRun).toBe(false);
+      expect(options.migrationsRun).toBe(true);
     });
 
     it('sets timeouts so a hung database cannot block the pool indefinitely (WARNING #1)', () => {

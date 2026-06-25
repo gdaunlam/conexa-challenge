@@ -16,7 +16,7 @@ export function setupSwagger(app: INestApplication, configService: ConfigService
     .setTitle('Movies API')
     .setDescription(
       'Backend para gestion de peliculas sincronizadas con SWAPI.\n\n' +
-        'Coleccion de Postman (smoke testing, 4 flows criticos): ' +
+        'Coleccion de Postman (smoke testing): ' +
         '`postman/movies-backend.postman_collection.json`',
     )
     .setVersion('1.0')

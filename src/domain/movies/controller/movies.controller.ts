@@ -31,7 +31,7 @@ export class MoviesController {
   @ApiOperation({
     summary: 'Listado publico paginado con search y sort.',
   })
-  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'search', required: false, type: String, minLength: 1, maxLength: 100 })
   @ApiQuery({ name: 'sortBy', required: false, enum: SortBy })
   @ApiQuery({ name: 'order', required: false, enum: SortOrder })
   @ApiQuery({ name: 'page', required: false, type: Number, minimum: 1 })
@@ -55,6 +55,11 @@ export class MoviesController {
       },
     },
   })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Validacion fallida (search > 100 chars, page < 1, limit > 100, sortBy/order invalido).',
+  })
   findAll(@Query() query: FindMoviesQueryDto): Promise<{
     items: MovieResponseDto[];
     meta: { page: number; limit: number; total: number; totalPages: number };
@@ -68,6 +73,7 @@ export class MoviesController {
   })
   @ApiBearerAuth()
   @ApiResponse({ status: 200, description: 'Pelicula encontrada.', type: MovieResponseDto })
+  @ApiResponse({ status: 400, description: 'id invalido (debe ser entero positivo).' })
   @ApiResponse({ status: 401, description: 'No autenticado.' })
   @ApiResponse({ status: 404, description: 'Pelicula no existe o esta soft-deleted.' })
   findOne(@Param('id', PositiveIntPipe) id: number): Promise<MovieResponseDto> {
