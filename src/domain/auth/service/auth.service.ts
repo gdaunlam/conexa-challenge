@@ -3,11 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import { BcryptPasswordService } from './bcrypt-password.service';
 import { JwtTokenService } from './jwt-token.service';
-import {
-  EMAIL_ALREADY_REGISTERED_MESSAGE,
-  INVALID_CREDENTIALS_MESSAGE,
-  normalizeEmail,
-} from '../utils/normalize-email';
+import { INVALID_CREDENTIALS_MESSAGE, normalizeEmail } from '../utils/normalize-email';
 import { User } from '../repository/user.entity';
 import { DEFAULT_USER_ROLE } from '../enums/user-role.enum';
 import { LoginDto } from '../controller/dto/login.dto';
@@ -45,10 +41,14 @@ export class AuthService {
       });
     } catch (error) {
       if (this.isUniqueViolation(error)) {
+        // Anti user enumeration (ENDPOINTS.md §2): el caso de unicidad debe
+        // ser indistinguible de un error de validacion de formato. Por eso
+        // message=Validation failed y details vacio (sin pistas del campo).
+        this.logger.warn(`signup conflict code=email_already_registered`);
         throw new BadRequestException({
           error: 'Bad Request',
-          message: EMAIL_ALREADY_REGISTERED_MESSAGE,
-          details: null,
+          message: 'Validation failed',
+          details: [],
         });
       }
       throw error;

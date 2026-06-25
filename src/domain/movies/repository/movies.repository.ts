@@ -33,7 +33,12 @@ export class MoviesRepository {
     const qb = this.repo.createQueryBuilder('movie').where('movie.deleted_at IS NULL');
 
     if (options.search !== undefined && options.search.length > 0) {
-      qb.andWhere('(movie.title <% :search OR movie.director <% :search)', {
+      // pg_trgm `<%` toma la primera cadena como fuente de palabras y la
+      // segunda como consulta. Ponemos `:search` primero para que la palabra
+      // del cliente se compare contra el cuerpo completo de title/director.
+      // Si se invirtiera (`title <% :search`) el word_similarity entre la
+      // cadena larga y la corta cae bajo el threshold (0.3) y nunca matchea.
+      qb.andWhere('(:search <% movie.title OR :search <% movie.director)', {
         search: options.search,
       });
     }

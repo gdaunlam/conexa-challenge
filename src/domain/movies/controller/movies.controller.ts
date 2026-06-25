@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -14,12 +15,38 @@ import type { Response } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../auth/decorators/public.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { PositiveIntPipe } from '../../../common/pipes/positive-int.pipe';
 import { CreateMovieDto } from './dto/create-movie.dto';
 import { FindMoviesQueryDto, SortBy, SortOrder } from './dto/find-movies-query.dto';
 import { MovieResponseDto } from './dto/movie-response.dto';
 import { UpdateMovieDto } from './dto/update-movie.dto';
 import { MoviesService } from '../service/movies.service';
+
+const DIGITS_ONLY = /^\d+$/;
+
+function parsePositiveId(raw: unknown): number {
+  // El ValidationPipe global corre ANTES de cualquier param pipe especifico y,
+  // con `transform: true`, aplica Number(raw) al parametro. Eso convierte
+  // "0x1" en 1, "1.5" en 1.5, "1e5" en 100000, "+1" en 1, etc. Para bypassear
+  // esa coercion (que no distingue entre "1" y "0x1") leemos el string crudo
+  // del request y validamos nosotros. Esto aplica tanto al caso global-
+  // transformed (donde llega un number) como al path crudo (string).
+  if (typeof raw !== 'string' || !DIGITS_ONLY.test(raw)) {
+    throw new BadRequestException({
+      error: 'Bad Request',
+      message: 'id must be a positive integer',
+      details: null,
+    });
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (parsed <= 0 || !Number.isSafeInteger(parsed)) {
+    throw new BadRequestException({
+      error: 'Bad Request',
+      message: 'id must be a positive integer',
+      details: null,
+    });
+  }
+  return parsed;
+}
 
 @ApiTags('movies')
 @Controller('movies')
@@ -76,7 +103,8 @@ export class MoviesController {
   @ApiResponse({ status: 400, description: 'id invalido (debe ser entero positivo).' })
   @ApiResponse({ status: 401, description: 'No autenticado.' })
   @ApiResponse({ status: 404, description: 'Pelicula no existe o esta soft-deleted.' })
-  findOne(@Param('id', PositiveIntPipe) id: number): Promise<MovieResponseDto> {
+  findOne(@Param('id') rawId: string): Promise<MovieResponseDto> {
+    const id = parsePositiveId(rawId);
     return this.moviesService.findOne(id);
   }
 
@@ -117,9 +145,10 @@ export class MoviesController {
   @ApiResponse({ status: 403, description: 'No es admin.' })
   @ApiResponse({ status: 404, description: 'Pelicula no existe o esta soft-deleted.' })
   update(
-    @Param('id', PositiveIntPipe) id: number,
+    @Param('id') rawId: string,
     @Body() dto: UpdateMovieDto,
   ): Promise<MovieResponseDto> {
+    const id = parsePositiveId(rawId);
     return this.moviesService.update(id, dto);
   }
 
@@ -134,7 +163,8 @@ export class MoviesController {
   @ApiResponse({ status: 401, description: 'No autenticado.' })
   @ApiResponse({ status: 403, description: 'No es admin.' })
   @ApiResponse({ status: 404, description: 'id nunca existio.' })
-  async remove(@Param('id', PositiveIntPipe) id: number): Promise<void> {
+  async remove(@Param('id') rawId: string): Promise<void> {
+    const id = parsePositiveId(rawId);
     await this.moviesService.remove(id);
   }
 }

@@ -7,10 +7,7 @@ import { User } from '../repository/user.entity';
 import { DEFAULT_USER_ROLE } from '../enums/user-role.enum';
 import { LoginDto } from '../controller/dto/login.dto';
 import { SignupDto } from '../controller/dto/signup.dto';
-import {
-  EMAIL_ALREADY_REGISTERED_MESSAGE,
-  INVALID_CREDENTIALS_MESSAGE,
-} from '../utils/normalize-email';
+import { INVALID_CREDENTIALS_MESSAGE } from '../utils/normalize-email';
 
 type UserFixture = {
   id: string;
@@ -143,7 +140,7 @@ describe('AuthService', () => {
       expect(insertArg.passwordHash).toMatch(/^\$2[aby]\$\d{2}\$/);
     });
 
-    it('throws BadRequestException with the generic message when the email is already registered', async () => {
+    it('throws BadRequestException with the generic validation message when the email is already registered (anti user enumeration)', async () => {
       const ctx = buildAuthService({ uniqueViolation: true });
       const dto: SignupDto = { email: 'foo@bar.com', name: 'Foo Bar', password: 'StrongP4ssw0rd#' };
 
@@ -154,10 +151,12 @@ describe('AuthService', () => {
       } catch (caught) {
         const exception = caught as BadRequestException;
         const response = exception.getResponse() as Record<string, unknown>;
+        // ENDPOINTS.md §2: el caso de unicidad debe ser indistinguible de un
+        // error de validacion de formato. Message generico + details vacio.
         expect(response).toMatchObject({
           error: 'Bad Request',
-          message: EMAIL_ALREADY_REGISTERED_MESSAGE,
-          details: null,
+          message: 'Validation failed',
+          details: [],
         });
       }
     });

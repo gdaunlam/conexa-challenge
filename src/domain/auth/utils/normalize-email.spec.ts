@@ -1,4 +1,4 @@
-import { EMAIL_MAX_LENGTH, INVALID_CREDENTIALS_MESSAGE, normalizeEmail, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, EMAIL_ALREADY_REGISTERED_MESSAGE } from './normalize-email';
+import { EMAIL_MAX_LENGTH, INVALID_CREDENTIALS_MESSAGE, normalizeEmail, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from './normalize-email';
 import { PASSWORD_REGEX } from '../constants';
 
 describe('normalizeEmail', () => {
@@ -38,10 +38,6 @@ describe('auth constants', () => {
 
   it('exposes a single, fixed invalid-credentials message (anti-enumeration)', () => {
     expect(INVALID_CREDENTIALS_MESSAGE).toBe('Invalid credentials');
-  });
-
-  it('exposes a single, fixed email-already-registered message (anti-enumeration)', () => {
-    expect(EMAIL_ALREADY_REGISTERED_MESSAGE).toBe('Email already registered');
   });
 
   it('exposes the password regex from the spec', () => {

@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import type { Response } from 'express';
 import { MoviesController } from './movies.controller';
 import { MoviesService } from '../service/movies.service';
@@ -100,13 +100,26 @@ describe('MoviesController', () => {
 
   describe('findOne', () => {
     it('parses id as integer and delegates', async () => {
-      await controller.findOne(42);
+      await controller.findOne('42');
       expect(service.findOne).toHaveBeenCalledWith(42);
     });
 
     it('propagates NotFoundException from service', async () => {
       service.findOne.mockRejectedValue(new NotFoundException('Movie 999 not found'));
-      await expect(controller.findOne(999)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(controller.findOne('999')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it.each(['0x1', '1.5', '1e5', 'abc', '0', '-1', ''])(
+      'rejects malformed id %p with 400 BadRequestException',
+      async (rawId) => {
+        await expect(controller.findOne(rawId)).rejects.toBeInstanceOf(BadRequestException);
+      },
+    );
+
+    it('rejects huge id (over MAX_SAFE_INTEGER) with 400 BadRequestException', async () => {
+      await expect(controller.findOne('99999999999999999999')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
   });
 
@@ -193,26 +206,32 @@ describe('MoviesController', () => {
 
   describe('update', () => {
     it('delegates update and returns movie DTO', async () => {
-      const result = await controller.update(1, { title: 'Updated' });
+      const result = await controller.update('1', { title: 'Updated' });
       expect(result.title).toBe('Updated');
     });
 
     it('propagates NotFoundException from service', async () => {
       service.update.mockRejectedValue(new NotFoundException('Movie 999 not found'));
-      await expect(controller.update(999, { title: 'X' })).rejects.toBeInstanceOf(
+      await expect(controller.update('999', { title: 'X' })).rejects.toBeInstanceOf(
         NotFoundException,
+      );
+    });
+
+    it('rejects malformed id with 400 BadRequestException', async () => {
+      await expect(controller.update('0x1', { title: 'X' })).rejects.toBeInstanceOf(
+        BadRequestException,
       );
     });
   });
 
   describe('remove', () => {
     it('returns void when soft-delete succeeds', async () => {
-      await expect(controller.remove(1)).resolves.toBeUndefined();
+      await expect(controller.remove('1')).resolves.toBeUndefined();
     });
 
     it('propagates NotFoundException from service', async () => {
       service.remove.mockRejectedValue(new NotFoundException('Movie 999 not found'));
-      await expect(controller.remove(999)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(controller.remove('999')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });

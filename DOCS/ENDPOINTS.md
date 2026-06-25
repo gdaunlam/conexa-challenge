@@ -129,11 +129,12 @@
 
 > **Decisión — búsqueda (`word_similarity` con `pg_trgm`):** la búsqueda de `search` usa el operador `word_similarity` (`<%`) de la extensión `pg_trgm` sobre `title` y `director`:
 > ```
-> WHERE title <% :search OR director <% :search
+> WHERE :search <% title OR :search <% director
 > ```
-> El operador `<%` devuelve `true` cuando **alguna palabra** del lado izquierdo es similar al string del lado derecho (más allá del threshold `pg_trgm.similarity_threshold`, default `0.3`). Esto significa:
-> - `search="hope"` matchea `title="A New Hope"` porque "Hope" es similar a "hope".
-> - `search="empire"` matchea `title="The Empire Strikes Back"` por la palabra "Empire".
+> El operador `<%` toma la **primera cadena como fuente de palabras** y la **segunda como consulta completa**: devuelve `true` cuando alguna palabra de la primera cadena es similar a la segunda (más allá del threshold `pg_trgm.word_similarity_threshold`, default `0.3`). Esto significa:
+> - `:search` debe ir del lado izquierdo (no al revés) para que la palabra del cliente se compare contra el cuerpo completo de `title`/`director`. Si se invierte (`title <% :search`), el word_similarity entre la cadena larga y la corta cae bajo el threshold y no matchea.
+> - `search="hope"` matchea `title="A New Hope"` porque la palabra `Hope` es idéntica a `hope` (`word_similarity('hope', 'A New Hope') = 1.0`).
+> - `search="empire"` matchea `title="The Empire Strikes Back"` por la palabra `Empire`.
 > - El matching es **case-insensitive** y robusto a espacios y variaciones Unicode (ligaduras, acentos) sin necesidad de normalización previa.
 > - Los caracteres `%` y `_` en el search **no son especiales** (no hay que escaparlos).
 

@@ -57,8 +57,11 @@ describe('MoviesRepository', () => {
       });
 
       const qb = repoMock.createQueryBuilder.mock.results[0]!.value;
+      // `:search` va primero: pg_trgm `<%` toma la primera cadena como fuente
+      // de palabras y la segunda como consulta. Asi `'hope' <% 'A New Hope'`
+      // matchea (la palabra 'Hope' es similar a 'hope').
       expect(qb.andWhere).toHaveBeenCalledWith(
-        '(movie.title <% :search OR movie.director <% :search)',
+        '(:search <% movie.title OR :search <% movie.director)',
         { search: 'hope' },
       );
     });

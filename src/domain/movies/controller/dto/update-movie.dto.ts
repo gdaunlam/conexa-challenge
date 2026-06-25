@@ -94,12 +94,14 @@ export class UpdateMovieDto {
   openingCrawl?: string | null;
 
   @ApiProperty({
-    description: 'JSONB con metadata adicional. Ausencia = no modificar.',
+    description:
+      'JSONB con metadata adicional. Ausencia = no modificar. `null` = 400 (NOT NULL en DB).',
     required: false,
     type: Object,
     additionalProperties: true,
+    nullable: false,
   })
-  @IsOptional()
+  @ValidateIf((o) => o.attributes !== undefined)
   @IsObject()
   attributes?: Record<string, unknown>;
 }
