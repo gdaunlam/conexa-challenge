@@ -10,7 +10,6 @@ import {
   Min,
   MinLength,
   ValidationError,
-  validate,
   validateSync,
 } from 'class-validator';
 
@@ -113,27 +112,7 @@ const SHARED_VALIDATE_OPTIONS = {
 const groupsFor = (env: EnvVars): string[] =>
   env.NODE_ENV === NodeEnv.Production ? [PRODUCTION_GROUP] : [DEFAULT_GROUP];
 
-export async function validateEnv(
-  rawConfig: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
-  // eslint-disable-next-line no-console
-  console.error('DBG validateEnv called with', Object.keys(rawConfig).length, 'keys, DATABASE_PASSWORD=', rawConfig.DATABASE_PASSWORD);
-  const validated = plainToInstance(EnvVars, rawConfig, {
-    enableImplicitConversion: true,
-  });
-  const errors = await validate(validated, {
-    ...SHARED_VALIDATE_OPTIONS,
-    groups: groupsFor(validated),
-  });
-  if (errors.length > 0) {
-    throw new Error(formatValidationErrors(errors));
-  }
-  // eslint-disable-next-line no-console
-  console.error('DBG validateEnv returning rawConfig with', Object.keys(rawConfig).length, 'keys, DATABASE_PASSWORD=', rawConfig.DATABASE_PASSWORD);
-  return rawConfig;
-}
-
-export function validateEnvSync(
+export function validateEnv(
   rawConfig: Record<string, unknown>,
 ): Record<string, unknown> {
   const validated = plainToInstance(EnvVars, rawConfig, {
@@ -148,6 +127,8 @@ export function validateEnvSync(
   }
   return rawConfig;
 }
+
+export const validateEnvSync = validateEnv;
 
 function formatValidationErrors(errors: ValidationError[]): string {
   return errors
