@@ -50,6 +50,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const logMessage = `[${traceId}] ${request.method} ${request.path} -> ${statusCode} ${error}: ${message}`;
     if (statusCode >= 500) {
       this.logger.error(logMessage);
+      // Loguear el stacktrace del error original para facilitar debugging.
+      // En produccion esto iria a un sistema externo (Sentry, etc).
+      if (exception instanceof Error && exception.stack) {
+        this.logger.error(exception.stack);
+      }
     } else {
       this.logger.warn(logMessage);
     }
@@ -70,6 +75,23 @@ export class HttpExceptionFilter implements ExceptionFilter {
     message: string;
     details: ErrorDetail[] | null;
   } {
+    // body-parser lanza PayloadTooLargeError (error nativo, NO HttpException)
+    // cuando el body supera el limite del parser (~100KB). Lo mapeamos a
+    // 413 para no exponer un 500 generico cuando el problema es claramente
+    // "el cliente mando un body demasiado grande".
+    if (this.isPayloadTooLarge(exception)) {
+      const message =
+        exception instanceof Error && exception.message
+          ? exception.message
+          : 'Request body too large';
+      return {
+        statusCode: HttpStatus.PAYLOAD_TOO_LARGE,
+        error: 'Payload Too Large',
+        message,
+        details: null,
+      };
+    }
+
     if (exception instanceof HttpException) {
       const statusCode = exception.getStatus();
       const exceptionResponse = exception.getResponse();
@@ -113,6 +135,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message: 'Internal server error',
       details: null,
     };
+  }
+
+  private isPayloadTooLarge(exception: unknown): boolean {
+    if (typeof exception !== 'object' || exception === null) {
+      return false;
+    }
+    const e = exception as { name?: unknown; type?: unknown; code?: unknown };
+    return (
+      e.name === 'PayloadTooLargeError' ||
+      e.type === 'entity.too.large' ||
+      e.code === 'LIMIT_FILE_SIZE' ||
+      e.code === 'LIMIT_UNEXPECTED_FILE'
+    );
   }
 
   private isErrorDetail(value: unknown): value is ErrorDetail {

@@ -192,16 +192,43 @@ describe('HttpExceptionFilter', () => {
 
     it('logs 500 Internal Server Error as error (genuine server-side failure)', () => {
       buildMocks();
-      filter.catch(new Error('boom'), mockHost);
-      expect(errorSpy).toHaveBeenCalledTimes(1);
+      const err = new Error('boom');
+      filter.catch(err, mockHost);
+      // 2 calls: el mensaje + el stacktrace para facilitar debugging.
+      expect(errorSpy).toHaveBeenCalledTimes(2);
+      expect(errorSpy.mock.calls[0]?.[0]).toContain('500 Internal Server Error');
+      expect(errorSpy.mock.calls[1]?.[0]).toContain('Error: boom');
       expect(warnSpy).not.toHaveBeenCalled();
     });
 
     it('logs 503 Service Unavailable as error (genuine server-side failure)', () => {
       buildMocks();
-      filter.catch(new ServiceUnavailableException('Database connection not available'), mockHost);
-      expect(errorSpy).toHaveBeenCalledTimes(1);
+      const err = new ServiceUnavailableException('Database connection not available');
+      filter.catch(err, mockHost);
+      expect(errorSpy).toHaveBeenCalledTimes(2);
       expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('maps PayloadTooLargeError to 413 Payload Too Large', () => {
+      buildMocks();
+      const err = Object.assign(new Error('request entity too large'), {
+        name: 'PayloadTooLargeError',
+      });
+      filter.catch(err, mockHost);
+      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.PAYLOAD_TOO_LARGE);
+      expect(mockResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          statusCode: HttpStatus.PAYLOAD_TOO_LARGE,
+          error: 'Payload Too Large',
+        }),
+      );
+    });
+
+    it('maps entity.too.large (multer-style) to 413', () => {
+      buildMocks();
+      const err = Object.assign(new Error('File too large'), { type: 'entity.too.large' });
+      filter.catch(err, mockHost);
+      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.PAYLOAD_TOO_LARGE);
     });
   });
 });

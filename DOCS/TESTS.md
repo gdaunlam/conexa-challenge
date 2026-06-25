@@ -253,6 +253,85 @@ if (typeof raw !== 'string' || !/^\d+$/.test(raw)) throw 400;
 
 ---
 
+## Cuarta iteracion de pruebas
+
+### H11 — CRITICAL · `PayloadTooLargeError` (body > ~100KB) → 500 en vez de 413
+
+**Sintoma**:
+```
+POST /api/v1/movies con body de 200KB → HTTP 500
+```
+
+**Root cause**: el body-parser default de Express tiene limit ~100KB. Cuando se excede, lanza `PayloadTooLargeError` (error nativo, no `HttpException`). El `HttpExceptionFilter` lo trataba como error generico → 500 con "Internal server error".
+
+**Fix aplicado**: `HttpExceptionFilter.isPayloadTooLarge()` detecta el error por `name === 'PayloadTooLargeError'` o `type === 'entity.too.large'` (multer) y lo mapea a **413 Payload Too Large** con shape §6. Tambien se loguea el stacktrace de errores 500 genuinos para facilitar debugging futuro.
+
+**Verificacion runtime**: body 200KB → **413** con `{statusCode: 413, error: "Payload Too Large"}` ✅
+
+### H12 — CRITICAL · `releaseDate` con fecha imposible (ej. `2024-02-30`) → 500 en vez de 400
+
+**Sintoma**:
+```
+PATCH /api/v1/movies/1 {"releaseDate": "2024-02-30"} → HTTP 500
+```
+
+**Stacktrace**: `QueryFailedError: date/time field value out of range: "2024-02-30"` (Postgres `22008 datetime_field_overflow`).
+
+**Root cause**: `@IsDateString()` acepta `2024-02-30` porque matchea el patron `YYYY-MM-DD` (10 chars), pero NO verifica que la fecha sea calendar-valid. Pasa el DTO, llega al UPDATE, Postgres rechaza, `QueryFailedError` sin manejo → 500.
+
+**Fix aplicado**: `@IsDateString()` → `@IsDateString({ strict: true })`. Verificado:
+- `2024-02-30` (feb 30) → **400** isDateString ✅
+- `2024-02-29` (año bisiesto) → 201 ✅
+- `2023-02-29` (año no bisiesto) → **400** isDateString ✅
+- `2024-13-01` (mes 13) → **400** ✅
+- `2024-01-01` (valida) → 201 ✅
+
+### H13 — CRITICAL · `releaseDate="2024-W01-1"` (ISO week format) → 500 en vez de 400
+
+**Sintoma**:
+```
+POST /api/v1/movies {"releaseDate": "2024-W01-1"} → HTTP 500
+```
+
+**Stacktrace**: `QueryFailedError: invalid input syntax for type date: "2024-W01-1"` (Postgres syntax error).
+
+**Root cause**: `@IsDateString({ strict: true })` acepta ISO 8601 week format (`YYYY-Www-d`) porque es un formato ISO 8601 valido, pero Postgres `DATE` solo acepta `YYYY-MM-DD`.
+
+**Fix aplicado**: agregar `@Matches(/^\d{4}-\d{2}-\d{2}$/)` ademas de `@IsDateString({ strict: true })` y `@Length(10, 10)`. Triple check: formato regex estricto + longitud exacta + isDateString strict.
+
+**Verificacion runtime**:
+
+| Input | Despues fix |
+|---|---|
+| `2024-W01-1` (ISO week) | **400** ✅ |
+| `2024-005` (ordinal) | **400** ✅ |
+| `2024-1-1` (sin zero-pad) | **400** ✅ |
+| `2024/01/15` (slash) | **400** ✅ |
+| `01-15-2024` (US) | **400** ✅ |
+| `2024-13-45` (mes/dia invalidos) | **400** ✅ |
+| `2024-02-30` (feb 30) | **400** ✅ |
+| `2024-02-29` (año bisiesto) | 201 ✅ |
+| `2024-01-01` (valida) | 201 ✅ |
+| `9999-12-31` (max Postgres date) | 201 ✅ |
+| `1800-01-01` (pre-1900) | 201 ✅ |
+
+---
+
+## Resumen total de fixes
+
+| Iter | Fix | Bug |
+|------|-----|-----|
+| 1 | H1 | Signup email duplicado filtraba existencia (user enumeration) |
+| 1 | H2 | Search `<%` invertido vs semantica de pg_trgm |
+| 1 | H3 | `GET /health` no existia |
+| 2 | N5 | PATCH `attributes:null` → 500 |
+| 3 | E10+E11+E23 | id parsing bypaseado por `transform:true` global |
+| 4 | H11 | `PayloadTooLargeError` → 500 |
+| 4 | H12 | `releaseDate` fecha invalida (feb 30) → 500 |
+| 4 | H13 | `releaseDate` ISO week format → 500 |
+
+---
+
 ## Hallazgos pendientes (no aplicados)
 
 ### H4 — WARNING · Email regex acepta puntos consecutivos

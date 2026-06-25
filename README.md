@@ -192,13 +192,13 @@ No se incluyó una Postman collection en este repo (decisión de scope: no se pr
 
 ### Cosas dejadas de lado (no prioritarias en 4h)
 
-- **Postman collection**: no se generó. Los curl examples del README o Swagger UI sirven para probar manualmente.
-- **Tests e2e con supertest**: hay tests unitarios extensivos pero no se armaron e2e contra el server levantado. Para un proyecto más maduro, sumaría tests de integración con `supertest` + DB en memoria.
+ - **Postman collection**: generada en `postman/movies-backend.postman_collection.json` (10 requests: Auth 2, Movies 6, Sync 2) con scripts de smoke test. Documentada también abajo (sección Postman).
+- **Tests e2e con supertest**: hay tests unitarios extensivos (337 tests, 29 suites) pero no se armaron e2e contra el server levantado. Para un proyecto más maduro, sumaría tests de integración con `supertest` + DB en memoria.
 - **Deploy**: no se deployó. El proyecto está listo para deployarse a Render/Railway/Fly (los 3 soportan Node + Postgres). Falta: Dockerfile, configuración de secrets, script de CI/CD que corra `pnpm test && pnpm lint && pnpm build && pnpm migration:run`.
 - **CRON de sync**: el endpoint `POST /movies/sync` está hecho, pero no hay `@nestjs/schedule` con un `@Cron(...)` que lo dispare periódicamente. Se puede agregar sin tocar el service (la lógica está separada del controller).
 - **Refresh tokens / logout**: no implementado. La auth actual es stateless con TTL 1h.
 - **Endpoint para listar/restaurar películas soft-deleted**: no en scope. Si se necesita para auditoría admin, es agregar 2 endpoints al `movies.controller`.
-- **Healthcheck endpoint (`GET /health`)**: borrado durante la limpieza final porque no se iba a deployar. Si se necesita para Render/Railway/Fly, hay que volver a crearlo (era un SELECT 1 a Postgres con timeout 5s).
+- **Healthcheck endpoint (`GET /api/v1/health`)**: implementado. Hace `SELECT 1` contra la DB; devuelve 200 con `{ status, timestamp, uptime }` si OK, 503 si la DB no responde. Útil para Render/Railway/Fly healthcheck y smoke test post-deploy. Documentado en `ENDPOINTS.md` §5.
 - **Rate limiting**: no implementado. Un endpoint público (`GET /movies`) sin rate limit es vulnerable a scraping/abuse. Para producción sumaría `@nestjs/throttler`.
 - **Logging estructurado**: los logs son texto plano con códigos (`movie_created`, `sync_completed`, etc.). Para producción sumaría Winston o Pino con JSON structured logs.
 

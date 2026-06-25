@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   Length,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -21,6 +22,7 @@ const MAX_PRODUCER_LENGTH = 200;
 const MAX_OPENING_CRAWL_LENGTH = 5000;
 const MAX_EXTERNAL_ID_LENGTH = 100;
 const RELEASE_DATE_LENGTH = 10;
+const STRICT_DATE_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
 
 export class CreateMovieDto {
   @ApiProperty({
@@ -60,8 +62,11 @@ export class CreateMovieDto {
     minLength: 10,
     maxLength: 10,
   })
-  @IsDateString()
+  @IsDateString({ strict: true })
   @Length(RELEASE_DATE_LENGTH, RELEASE_DATE_LENGTH)
+  @Matches(STRICT_DATE_FORMAT, {
+    message: 'releaseDate must match YYYY-MM-DD (no ISO week/ordinal format)',
+  })
   releaseDate!: string;
 
   @ApiProperty({
