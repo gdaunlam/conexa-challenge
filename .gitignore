@@ -1,0 +1,19 @@
+node_modules
+dist
+build
+coverage
+*.tsbuildinfo
+
+# Logs
+*.log
+pnpm-debug.log*
+
+# Variables de entorno (solo se commitea .env.example)
+.env
+.env.*
+!.env.example
+
+# Editores / IDEs
+.idea
+.vscode
+.DS_Store
