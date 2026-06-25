@@ -6,7 +6,6 @@ import { JwtTokenService } from './jwt-token.service';
 import {
   EMAIL_ALREADY_REGISTERED_MESSAGE,
   INVALID_CREDENTIALS_MESSAGE,
-  isValidNormalizedEmail,
   normalizeEmail,
 } from '../utils/normalize-email';
 import { User } from '../repository/user.entity';
@@ -35,20 +34,13 @@ export class AuthService {
   async signup(signupDto: SignupDto): Promise<void> {
     const normalizedEmail = normalizeEmail(signupDto.email);
 
-    if (!isValidNormalizedEmail(normalizedEmail)) {
-      throw new BadRequestException({
-        error: 'Bad Request',
-        message: EMAIL_ALREADY_REGISTERED_MESSAGE,
-        details: null,
-      });
-    }
-
     const passwordHash = await this.passwordService.hash(signupDto.password);
 
     try {
       await this.usersRepository.insert({
         email: normalizedEmail,
         passwordHash,
+        name: signupDto.name,
         role: DEFAULT_USER_ROLE,
       });
     } catch (error) {

@@ -70,7 +70,7 @@ describe('User entity', () => {
       .columns.filter((column) => column.target === User)
       .map((column) => column.propertyName)
       .sort();
-    expect(ownColumnNames).toEqual(['email', 'passwordHash', 'role'].sort());
+    expect(ownColumnNames).toEqual(['email', 'name', 'passwordHash', 'role'].sort());
 
     const baseColumns = getMetadataArgsStorage()
       .columns.filter((column) => {

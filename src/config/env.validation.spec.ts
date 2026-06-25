@@ -1,4 +1,4 @@
-import { assertProductionHardeningSync, NodeEnv, validateEnv } from './env.validation';
+import { NodeEnv, validateEnv, validateEnvSync } from './env.validation';
 
 describe('validateEnv', () => {
   const originalEnv = { ...process.env };
@@ -193,36 +193,21 @@ describe('validateEnv', () => {
   });
 });
 
-describe('assertProductionHardeningSync', () => {
-  const originalEnv = { ...process.env };
-
+describe('validateEnvSync', () => {
   const validProdEnv: Record<string, string> = {
     NODE_ENV: NodeEnv.Production,
     JWT_SECRET: 'a-very-long-production-grade-jwt-secret-1234567890',
     DATABASE_PASSWORD: 'Xq-3fP9kL2mZ8sV4nQ7wR',
+    BCRYPT_COST: '10',
   };
 
-  afterAll(() => {
-    process.env = originalEnv;
-  });
-
-  it('rejects a production hardening violation loud', () => {
-    expect(() =>
-      assertProductionHardeningSync({
-        NODE_ENV: NodeEnv.Production,
-        JWT_SECRET: 'too-short',
-        DATABASE_PASSWORD: 'postgres1234567890ab',
-      }),
-    ).toThrow(/DATABASE_PASSWORD/);
-  });
-
   it('passes when production config is fully hardened', () => {
-    expect(() => assertProductionHardeningSync(validProdEnv)).not.toThrow();
+    expect(() => validateEnvSync(validProdEnv)).not.toThrow();
   });
 
-  it('does nothing for non-production envs (no class-validator rules apply)', () => {
+  it('does nothing for non-production envs (no production hardening applies)', () => {
     expect(() =>
-      assertProductionHardeningSync({
+      validateEnvSync({
         NODE_ENV: NodeEnv.Development,
         JWT_SECRET: 'a-long-enough-secret-for-tests-1234',
         DATABASE_PASSWORD: 'not-the-default-password',
@@ -230,18 +215,28 @@ describe('assertProductionHardeningSync', () => {
     ).not.toThrow();
   });
 
-  it('rejects loud (not TypeError) when JWT_SECRET is undefined in production (WARNING #2)', () => {
+  it('rejects a production hardening violation loud', () => {
     expect(() =>
-      assertProductionHardeningSync({
+      validateEnvSync({
+        NODE_ENV: NodeEnv.Production,
+        JWT_SECRET: 'too-short',
+        DATABASE_PASSWORD: 'postgres1234567890ab',
+      }),
+    ).toThrow(/DATABASE_PASSWORD/);
+  });
+
+  it('rejects loud when JWT_SECRET is undefined in production (WARNING #2)', () => {
+    expect(() =>
+      validateEnvSync({
         NODE_ENV: NodeEnv.Production,
         DATABASE_PASSWORD: 'Xq-3fP9kL2mZ8sV4nQ7wR',
       }),
     ).toThrow(/JWT_SECRET.*at least 32 characters/);
   });
 
-  it('rejects loud (not TypeError) when DATABASE_PASSWORD is undefined in production (WARNING #2)', () => {
+  it('rejects loud when DATABASE_PASSWORD is undefined in production (WARNING #2)', () => {
     expect(() =>
-      assertProductionHardeningSync({
+      validateEnvSync({
         NODE_ENV: NodeEnv.Production,
         JWT_SECRET: 'a-very-long-production-grade-jwt-secret-1234567890',
       }),
@@ -250,15 +245,15 @@ describe('assertProductionHardeningSync', () => {
 
   it('rejects loud when both JWT_SECRET and DATABASE_PASSWORD are undefined in production', () => {
     expect(() =>
-      assertProductionHardeningSync({
+      validateEnvSync({
         NODE_ENV: NodeEnv.Production,
       }),
-    ).toThrow(/JWT_SECRET.*at least 32 characters.*DATABASE_PASSWORD.*at least 12 characters/s);
+    ).toThrow(/(JWT_SECRET.*at least 32 characters.*DATABASE_PASSWORD.*at least 12 characters|DATABASE_PASSWORD.*at least 12 characters.*JWT_SECRET.*at least 32 characters)/s);
   });
 
   it('rejects loud when BCRYPT_COST < 10 in production (WARNING #2: cost min hardening)', () => {
     expect(() =>
-      assertProductionHardeningSync({
+      validateEnvSync({
         NODE_ENV: NodeEnv.Production,
         JWT_SECRET: 'a-very-long-production-grade-jwt-secret-1234567890',
         DATABASE_PASSWORD: 'Xq-3fP9kL2mZ8sV4nQ7wR',

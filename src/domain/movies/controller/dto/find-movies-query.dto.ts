@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 export enum SortBy {
   Title = 'title',
@@ -21,11 +21,13 @@ export class FindMoviesQueryDto {
   @ApiProperty({
     description: 'Texto a buscar en title y director con word_similarity.',
     required: false,
-    maxLength: 255,
+    minLength: 1,
+    maxLength: 100,
   })
   @IsOptional()
   @IsString()
-  @MaxLength(255)
+  @MinLength(1)
+  @MaxLength(100)
   search?: string;
 
   @ApiProperty({

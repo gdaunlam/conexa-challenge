@@ -114,13 +114,14 @@ describe('AuthService', () => {
   describe('signup', () => {
     it('normalizes the email and inserts a user with role "user" and a hashed password', async () => {
       const ctx = buildAuthService({});
-      const dto: SignupDto = { email: '  Foo@Example.COM  ', password: 'StrongP4ssw0rd#' };
+      const dto: SignupDto = { email: '  Foo@Example.COM  ', name: 'Foo Bar', password: 'StrongP4ssw0rd#' };
 
       await ctx.service.signup(dto);
 
       expect(ctx.insert).toHaveBeenCalledWith(
         expect.objectContaining({
           email: 'foo@example.com',
+          name: 'Foo Bar',
           role: DEFAULT_USER_ROLE,
           passwordHash: expect.stringMatching(/^\$2[aby]\$\d{2}\$/),
         }),
@@ -132,7 +133,7 @@ describe('AuthService', () => {
 
     it('hashes the password via BcryptPasswordService (never stores the plain text)', async () => {
       const ctx = buildAuthService({});
-      const dto: SignupDto = { email: 'foo@bar.com', password: 'StrongP4ssw0rd#' };
+      const dto: SignupDto = { email: 'foo@bar.com', name: 'Foo Bar', password: 'StrongP4ssw0rd#' };
 
       await ctx.service.signup(dto);
 
@@ -144,7 +145,7 @@ describe('AuthService', () => {
 
     it('throws BadRequestException with the generic message when the email is already registered', async () => {
       const ctx = buildAuthService({ uniqueViolation: true });
-      const dto: SignupDto = { email: 'foo@bar.com', password: 'StrongP4ssw0rd#' };
+      const dto: SignupDto = { email: 'foo@bar.com', name: 'Foo Bar', password: 'StrongP4ssw0rd#' };
 
       await expect(ctx.service.signup(dto)).rejects.toBeInstanceOf(BadRequestException);
 
@@ -161,32 +162,12 @@ describe('AuthService', () => {
       }
     });
 
-    it('throws BadRequestException with the generic message when the normalized email fails the regex', async () => {
-      const ctx = buildAuthService({});
-      const dto: SignupDto = { email: 'no-at-sign', password: 'StrongP4ssw0rd#' };
-
-      try {
-        await ctx.service.signup(dto);
-        throw new Error('expected rejection');
-      } catch (caught) {
-        const exception = caught as BadRequestException;
-        const response = exception.getResponse() as Record<string, unknown>;
-        expect(response).toMatchObject({
-          error: 'Bad Request',
-          message: EMAIL_ALREADY_REGISTERED_MESSAGE,
-          details: null,
-        });
-      }
-
-      expect(ctx.insert).not.toHaveBeenCalled();
-    });
-
     it('rethrows non-unique DB errors (e.g. connection lost) without swallowing them', async () => {
       const ctx = buildAuthService({});
       ctx.insert.mockRejectedValueOnce(new Error('connection lost'));
 
       await expect(
-        ctx.service.signup({ email: 'foo@bar.com', password: 'StrongP4ssw0rd#' }),
+        ctx.service.signup({ email: 'foo@bar.com', name: 'Foo Bar', password: 'StrongP4ssw0rd#' }),
       ).rejects.toThrow('connection lost');
     });
   });

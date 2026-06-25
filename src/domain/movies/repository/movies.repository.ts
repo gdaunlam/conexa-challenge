@@ -206,6 +206,44 @@ export class MoviesRepository {
     return this.findOneActiveById(id);
   }
 
+  async reactivateByExternalId(
+    externalId: string,
+    input: {
+      title: string;
+      director: string;
+      producer: string;
+      releaseDate: string;
+      episodeId?: number | null;
+      openingCrawl?: string | null;
+      attributes?: Record<string, unknown>;
+    },
+  ): Promise<Movie | null> {
+    const result = await this.repo
+      .createQueryBuilder()
+      .update(Movie)
+      .set({
+        title: input.title,
+        director: input.director,
+        producer: input.producer,
+        releaseDate: input.releaseDate,
+        episodeId: input.episodeId ?? null,
+        openingCrawl: input.openingCrawl ?? null,
+        attributes: (input.attributes ?? {}) as QueryDeepPartialEntity<Movie>['attributes'],
+        deletedAt: () => 'NULL',
+      })
+      .where('provider = :provider', { provider: DEFAULT_MOVIE_PROVIDER })
+      .andWhere('external_id = :externalId', { externalId })
+      .andWhere('deleted_at IS NOT NULL')
+      .returning('*')
+      .execute();
+
+    if (result.affected === 0) {
+      return null;
+    }
+
+    return this.findOneByProviderAndExternalId(DEFAULT_MOVIE_PROVIDER, externalId);
+  }
+
   async updateActive(
     id: number,
     partial: {

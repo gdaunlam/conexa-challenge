@@ -1,6 +1,8 @@
 pending
-    Postman collection
+in progress
+done
     agregar endpoints en swagger
+    Postman collection
     ver si el trace id recibe y emite el mismo trace
     README.md final
         aclara como usar la aplicacion
@@ -8,8 +10,6 @@ pending
         aclara donde estan los archivos adjuntos (postman collection, docs)
         nombra desiciones o contemplaciones especificas especiales, ej cosas
         dejadas de lado, hechas diferentes por motivos de tiempo o prioridades, o desiciones tomadas por falta de claridad en los requerimientos
-in progress
-done
     dominio
         Implementacion de
             endpoints

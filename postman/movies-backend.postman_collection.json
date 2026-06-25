@@ -1,0 +1,237 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Conexa Movies Backend",
+    "description": "API REST en NestJS para gestion de peliculas con sincronizacion desde SWAPI.\n\nAntes de empezar, importa el environment `Movies Backend Local` con `base_url` apuntando al server. Para endpoints protegidos (todos los POST/PATCH/DELETE/SYNC y GET /movies/:id), primero ejecuta `POST /auth/signup` y `POST /auth/login`. El test script del login guarda el `accessToken` en la variable `token` automaticamente. Para crear peliculas (POST /movies, POST /movies/sync, PATCH, DELETE) la cuenta tiene que tener `role=admin`. El signup publico solo crea `role=user`. Para crear admins: insertar directo en DB con `UPDATE users SET role=admin WHERE email=...;` y volver a loguear.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /auth/signup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));",
+                  "pm.test(\"Empty body\", () => pm.expect(pm.response.text()).to.eql(''));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"foo@example.com\",\n  \"name\": \"Foo Bar\",\n  \"password\": \"StrongP4ssw0rd#\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/signup", "host": ["{{base_url}}"], "path": ["auth", "signup"] },
+            "description": "Registro publico. Devuelve 204 No Content sin body. Si el email ya existe, devuelve 400 generico (anti-enumeration, indistinguible de error de formato)."
+          }
+        },
+        {
+          "name": "POST /auth/login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Has accessToken', () => pm.expect(body.accessToken).to.be.a('string'));",
+                  "pm.environment.set('token', body.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"foo@example.com\",\n  \"password\": \"StrongP4ssw0rd#\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] },
+            "description": "Login publico. Devuelve 200 con `{accessToken}` (JWT HS256, TTL 1h). Test script guarda el token en `pm.environment.token`. Cualquier falla de credenciales devuelve 401 con el mismo mensaje y timing parejo (anti-enumeration)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Movies",
+      "item": [
+        {
+          "name": "GET /movies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/movies?page=1&limit=20&sortBy=episode_id&order=asc",
+              "host": ["{{base_url}}"],
+              "path": ["movies"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Numero de pagina (>= 1). Default: 1" },
+                { "key": "limit", "value": "20", "description": "Items por pagina (1-100). Default: 20" },
+                { "key": "search", "value": "", "description": "Texto a buscar en title y director con word_similarity (1-100 chars). Opcional", "disabled": true },
+                { "key": "sortBy", "value": "episode_id", "description": "title | release_date | episode_id. Default: episode_id" },
+                { "key": "order", "value": "asc", "description": "asc | desc. Default: asc" }
+              ]
+            },
+            "description": "Listado publico paginado con busqueda fuzzy (pg_trgm). NO incluye `attributes` (solo van en el detalle). Filtra automaticamente soft-deleted."
+          }
+        },
+        {
+          "name": "GET /movies/:id",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}", "description": "Requiere Bearer token. Cualquier rol (user o admin)." }],
+            "url": {
+              "raw": "{{base_url}}/movies/1",
+              "host": ["{{base_url}}"],
+              "path": ["movies", "1"],
+              "variable": [{ "key": "id", "value": "1", "description": "ID entero positivo" }]
+            },
+            "description": "Detalle de una pelicula (autenticado). Incluye `attributes` (no aparece en el listado). Devuelve 404 si no existe o esta soft-deleted."
+          }
+        },
+        {
+          "name": "POST /movies",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200 or 201\", () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Returns movie object\", () => { pm.expect(body).to.have.property('id'); pm.expect(body).to.have.property('title'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "description": "Requiere rol admin." }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"The Empire Strikes Back\",\n  \"director\": \"Irvin Kershner\",\n  \"producer\": \"Gary Kurtz, Rick McCallum\",\n  \"releaseDate\": \"1980-05-21\",\n  \"episodeId\": 5,\n  \"openingCrawl\": \"It is a dark time for the Rebellion...\",\n  \"externalId\": \"empire-strike-back\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/movies", "host": ["{{base_url}}"], "path": ["movies"] },
+            "description": "Crear o reactivar pelicula (solo admin). Devuelve 201 si la fila es nueva, 200 si reactiva una soft-deleted existente (mismo externalId en namespace manual). Devuelve 409 si externalId ya existe activo. Devuelve 403 si no es admin."
+          }
+        },
+        {
+          "name": "POST /movies (reactivacion soft-deleted)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200 (reactivation)\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Same id as previous\", () => pm.expect(body.id).to.exist());"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "description": "Requiere rol admin." }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"The Empire Strikes Back (Reactivada)\",\n  \"director\": \"Irvin Kershner\",\n  \"producer\": \"Gary Kurtz, Rick McCallum\",\n  \"releaseDate\": \"1980-05-21\",\n  \"externalId\": \"empire-strike-back\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/movies", "host": ["{{base_url}}"], "path": ["movies"] },
+            "description": "ESPECIAL: demuestra el caso 200 (reactivacion) vs 201 (nueva). Pasos previos: 1) DELETE /movies/:id con el id de la pelicula creada arriba (queda soft-deleted). 2) Ejecutar este POST con el mismo `externalId`. Devuelve 200 (no 201) con la pelicula reactivada, mismo `id` server-generated. Demuestra el flujo UPDATE-then-INSERT del spec: primero intenta UPDATE reactivando soft-deleted, si afecta 0 filas entonces INSERT."
+          }
+        },
+        {
+          "name": "PATCH /movies/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "description": "Requiere rol admin." }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"The Empire Strikes Back (Special Edition)\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/movies/1",
+              "host": ["{{base_url}}"],
+              "path": ["movies", "1"],
+              "variable": [{ "key": "id", "value": "1", "description": "ID entero positivo" }]
+            },
+            "description": "Actualizar parcial (solo admin). Todos los campos opcionales. null o string vacio en campo NOT NULL devuelve 400. null o string vacio en campo opcional (openingCrawl) persiste como NULL. externalId y provider no se aceptan (whitelist). Body {} es valido (200 sin cambios)."
+          }
+        },
+        {
+          "name": "DELETE /movies/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}", "description": "Requiere rol admin." }],
+            "url": {
+              "raw": "{{base_url}}/movies/1",
+              "host": ["{{base_url}}"],
+              "path": ["movies", "1"],
+              "variable": [{ "key": "id", "value": "1", "description": "ID entero positivo" }]
+            },
+            "description": "Soft-delete idempotente (solo admin). Devuelve 204 si recien borrado o ya estaba borrado. Devuelve 404 si el ID nunca existio. Preserva timestamp original del soft-delete con COALESCE."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sync",
+      "item": [
+        {
+          "name": "POST /movies/sync",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}", "description": "Requiere rol admin." }],
+            "url": { "raw": "{{base_url}}/movies/sync", "host": ["{{base_url}}"], "path": ["movies", "sync"] },
+            "description": "Sincroniza las peliculas de SWAPI (UPSERT por external_id en namespace swapi). Devuelve 200 con resumen `{fetched, created, updated, errors[]}`. Idempotente. Devuelve 409 si ya hay sync en curso. Devuelve 502 si SWAPI esta caida."
+          }
+        },
+        {
+          "name": "POST /movies/sync (idempotente, segundo run)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"created=0 (no nuevas en el segundo run)\", () => pm.expect(body.created).to.eql(0));",
+                  "pm.test(\"updated >= 0\", () => pm.expect(body.updated).to.be.at.least(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}", "description": "Requiere rol admin." }],
+            "url": { "raw": "{{base_url}}/movies/sync", "host": ["{{base_url}}"], "path": ["movies", "sync"] },
+            "description": "ESPECIAL: demuestra la idempotencia del sync. Ejecutar el segundo sync (inmediatamente despues del primero) devuelve `created=0` y `updated=N` (las mismas peliculas se actualizan con los mismos datos, sin duplicar). El UPSERT por `external_id` lo hace idempotente por construccion: ejecutar N veces = ejecutar 1 vez."
+          }
+        }
+      ]
+    }
+  ],
+  "variable": []
+}

@@ -1,4 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import type { Response } from 'express';
 import { MoviesController } from './movies.controller';
 import { MoviesService } from '../service/movies.service';
 import { SortBy, SortOrder } from './dto/find-movies-query.dto';
@@ -110,16 +111,71 @@ describe('MoviesController', () => {
   });
 
   describe('create', () => {
-    it('delegates create and returns { status, movie }', async () => {
+    const buildRes = (): Response => {
+      const res = {
+        status: jest.fn().mockReturnThis(),
+      } as unknown as Response;
+      return res;
+    };
+
+    it('sets HTTP 201 when service returns status 201 (new movie)', async () => {
+      service.create.mockResolvedValue({
+        status: 201,
+        movie: {
+          id: '1',
+          title: 'T',
+          director: 'D',
+          producer: 'P',
+          releaseDate: '2025-01-01',
+          episodeId: null,
+          openingCrawl: null,
+          provider: 'manual',
+          externalId: null,
+          attributes: {},
+          createdAt: '2026-06-23T15:30:00.000Z',
+          updatedAt: '2026-06-23T15:30:00.000Z',
+        },
+      });
+      const res = buildRes();
       const dto = {
         title: 'T',
         director: 'D',
         producer: 'P',
         releaseDate: '2025-01-01',
       };
-      const result = await controller.create(dto);
-      expect(result.status).toBe(201);
-      expect(result.movie.title).toBe('T');
+      await controller.create(dto, res);
+      expect(res.status).toHaveBeenCalledWith(201);
+    });
+
+    it('sets HTTP 200 when service returns status 200 (reactivated soft-deleted)', async () => {
+      service.create.mockResolvedValue({
+        status: 200,
+        movie: {
+          id: '1',
+          title: 'T',
+          director: 'D',
+          producer: 'P',
+          releaseDate: '2025-01-01',
+          episodeId: null,
+          openingCrawl: null,
+          provider: 'manual',
+          externalId: 'abc',
+          attributes: {},
+          createdAt: '2026-06-23T15:30:00.000Z',
+          updatedAt: '2026-06-23T15:30:00.000Z',
+        },
+      });
+      const res = buildRes();
+      const dto = {
+        title: 'T',
+        director: 'D',
+        producer: 'P',
+        releaseDate: '2025-01-01',
+        externalId: 'abc',
+      };
+      const movie = await controller.create(dto, res);
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(movie.externalId).toBe('abc');
     });
 
     it('propagates ConflictException from service (externalId activo)', async () => {
@@ -131,7 +187,7 @@ describe('MoviesController', () => {
         releaseDate: '2025-01-01',
         externalId: 'abc',
       };
-      await expect(controller.create(dto)).rejects.toBeInstanceOf(ConflictException);
+      await expect(controller.create(dto, buildRes())).rejects.toBeInstanceOf(ConflictException);
     });
   });
 

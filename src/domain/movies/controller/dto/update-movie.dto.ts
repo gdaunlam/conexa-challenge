@@ -6,24 +6,27 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  Length,
   Max,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 const MAX_TITLE_LENGTH = 200;
 const MAX_DIRECTOR_LENGTH = 100;
 const MAX_PRODUCER_LENGTH = 200;
 const MAX_OPENING_CRAWL_LENGTH = 5000;
+const RELEASE_DATE_LENGTH = 10;
 
 export class UpdateMovieDto {
   @ApiProperty({
     description:
-      'Titulo. Ausencia = no modificar. Valor = reemplazar. `null` o `""` = 400 (NOT NULL).',
+      'Titulo. Ausencia = no modificar. `null` o `""` = 400 (NOT NULL).',
     required: false,
     maxLength: MAX_TITLE_LENGTH,
   })
-  @IsOptional()
+  @ValidateIf((o) => o.title !== undefined)
   @IsString()
   @IsNotEmpty()
   @MaxLength(MAX_TITLE_LENGTH)
@@ -34,7 +37,7 @@ export class UpdateMovieDto {
     required: false,
     maxLength: MAX_DIRECTOR_LENGTH,
   })
-  @IsOptional()
+  @ValidateIf((o) => o.director !== undefined)
   @IsString()
   @IsNotEmpty()
   @MaxLength(MAX_DIRECTOR_LENGTH)
@@ -45,36 +48,40 @@ export class UpdateMovieDto {
     required: false,
     maxLength: MAX_PRODUCER_LENGTH,
   })
-  @IsOptional()
+  @ValidateIf((o) => o.producer !== undefined)
   @IsString()
   @IsNotEmpty()
   @MaxLength(MAX_PRODUCER_LENGTH)
   producer?: string;
 
   @ApiProperty({
-    description: 'Fecha de estreno ISO 8601. `null` = 400 (NOT NULL). Ausencia = no modificar.',
+    description:
+      'Fecha de estreno ISO 8601 estricto (`YYYY-MM-DD`, 10 chars). `null` o `""` = 400 (NOT NULL). Ausencia = no modificar.',
     required: false,
     format: 'date',
   })
-  @IsOptional()
+  @ValidateIf((o) => o.releaseDate !== undefined)
   @IsDateString()
+  @Length(RELEASE_DATE_LENGTH, RELEASE_DATE_LENGTH)
   releaseDate?: string;
 
   @ApiProperty({
-    description: 'Numero de episodio. `null` = 400 (NOT NULL). Ausencia = no modificar.',
+    description:
+      'Numero de episodio. `null` = 400 (NOT NULL). Ausencia = no modificar.',
     required: false,
     nullable: true,
     minimum: 1,
     maximum: 20,
   })
-  @IsOptional()
+  @ValidateIf((o) => o.episodeId !== undefined)
   @IsInt()
   @Min(1)
   @Max(20)
   episodeId?: number;
 
   @ApiProperty({
-    description: 'Opening crawl. `null` o `""` = borrar (setear NULL en DB).',
+    description:
+      'Opening crawl. `null` o `""` = borrar (setear NULL en DB). Ausencia = no modificar.',
     required: false,
     nullable: true,
     maxLength: MAX_OPENING_CRAWL_LENGTH,
@@ -82,7 +89,7 @@ export class UpdateMovieDto {
   @IsOptional()
   @IsString()
   @MaxLength(MAX_OPENING_CRAWL_LENGTH)
-  openingCrawl?: string;
+  openingCrawl?: string | null;
 
   @ApiProperty({
     description: 'JSONB con metadata adicional. Ausencia = no modificar.',

@@ -5,19 +5,21 @@ import {
   Get,
   HttpCode,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../auth/decorators/public.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { PositiveIntPipe } from '../../../common/pipes/positive-int.pipe';
 import { CreateMovieDto } from './dto/create-movie.dto';
 import { FindMoviesQueryDto, SortBy, SortOrder } from './dto/find-movies-query.dto';
 import { MovieResponseDto } from './dto/movie-response.dto';
 import { UpdateMovieDto } from './dto/update-movie.dto';
-import { CreateMovieResult, MoviesService } from '../service/movies.service';
+import { MoviesService } from '../service/movies.service';
 
 @ApiTags('movies')
 @Controller('movies')
@@ -68,13 +70,12 @@ export class MoviesController {
   @ApiResponse({ status: 200, description: 'Pelicula encontrada.', type: MovieResponseDto })
   @ApiResponse({ status: 401, description: 'No autenticado.' })
   @ApiResponse({ status: 404, description: 'Pelicula no existe o esta soft-deleted.' })
-  findOne(@Param('id', ParseIntPipe) id: number): Promise<MovieResponseDto> {
+  findOne(@Param('id', PositiveIntPipe) id: number): Promise<MovieResponseDto> {
     return this.moviesService.findOne(id);
   }
 
   @Roles('admin')
   @Post()
-  @HttpCode(201)
   @ApiOperation({
     summary: 'Crear o reactivar pelicula por external_id (admin). Semantica PUT pura.',
   })
@@ -89,8 +90,13 @@ export class MoviesController {
   @ApiResponse({ status: 401, description: 'No autenticado.' })
   @ApiResponse({ status: 403, description: 'No es admin.' })
   @ApiResponse({ status: 409, description: 'externalId ya existe activo.' })
-  create(@Body() dto: CreateMovieDto): Promise<CreateMovieResult> {
-    return this.moviesService.create(dto);
+  async create(
+    @Body() dto: CreateMovieDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<MovieResponseDto> {
+    const result = await this.moviesService.create(dto);
+    res.status(result.status);
+    return result.movie;
   }
 
   @Roles('admin')
@@ -105,7 +111,7 @@ export class MoviesController {
   @ApiResponse({ status: 403, description: 'No es admin.' })
   @ApiResponse({ status: 404, description: 'Pelicula no existe o esta soft-deleted.' })
   update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', PositiveIntPipe) id: number,
     @Body() dto: UpdateMovieDto,
   ): Promise<MovieResponseDto> {
     return this.moviesService.update(id, dto);
@@ -122,7 +128,7 @@ export class MoviesController {
   @ApiResponse({ status: 401, description: 'No autenticado.' })
   @ApiResponse({ status: 403, description: 'No es admin.' })
   @ApiResponse({ status: 404, description: 'id nunca existio.' })
-  async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+  async remove(@Param('id', PositiveIntPipe) id: number): Promise<void> {
     await this.moviesService.remove(id);
   }
 }

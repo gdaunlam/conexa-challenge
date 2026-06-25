@@ -14,7 +14,11 @@ export function setupSwagger(app: INestApplication, configService: ConfigService
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Movies API')
-    .setDescription('Backend para gestion de peliculas sincronizadas con SWAPI')
+    .setDescription(
+      'Backend para gestion de peliculas sincronizadas con SWAPI.\n\n' +
+        'Coleccion de Postman (smoke testing, 4 flows criticos): ' +
+        '`postman/movies-backend.postman_collection.json`',
+    )
     .setVersion('1.0')
     .addBearerAuth()
     .build();

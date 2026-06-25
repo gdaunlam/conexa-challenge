@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import configuration from '../config/configuration';
-import { assertProductionHardeningSync } from '../config/env.validation';
+import { validateEnvSync } from '../config/env.validation';
 
 const DATA_SOURCE_CONNECT_TIMEOUT_MS = 5000;
 const DATA_SOURCE_STATEMENT_TIMEOUT_MS = 5000;
@@ -9,7 +9,7 @@ const DATA_SOURCE_QUERY_TIMEOUT_MS = 5000;
 
 const config = configuration();
 
-assertProductionHardeningSync(process.env);
+validateEnvSync(process.env);
 
 const AppDataSource = new DataSource({
   type: 'postgres',

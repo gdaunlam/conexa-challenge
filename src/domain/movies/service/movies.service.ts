@@ -1,15 +1,17 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { QueryFailedError } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
 import { CreateMovieDto } from '../controller/dto/create-movie.dto';
 import { FindMoviesQueryDto } from '../controller/dto/find-movies-query.dto';
 import { MovieResponseDto } from '../controller/dto/movie-response.dto';
 import { UpdateMovieDto } from '../controller/dto/update-movie.dto';
 import { Movie } from '../repository/movie.entity';
-import { DEFAULT_MOVIE_PROVIDER } from '../enums/movie-provider.enum';
 import { MoviesRepository } from '../repository/movies.repository';
 
 const LISTING_INCLUDE_ATTRIBUTES = false;
 const DETAIL_INCLUDE_ATTRIBUTES = true;
+
+const POSTGRES_UNIQUE_VIOLATION = '23505';
 
 export interface CreateMovieResult {
   status: 200 | 201;
@@ -80,14 +82,33 @@ export class MoviesService {
       attributes: dto.attributes ?? {},
     };
 
-    if (dto.externalId !== undefined && dto.externalId !== null) {
-      const existing = await this.repository.findOneByProviderAndExternalId(
-        DEFAULT_MOVIE_PROVIDER,
+    if (dto.externalId !== undefined && dto.externalId !== null && dto.externalId !== '') {
+      const reactivated = await this.repository.reactivateByExternalId(
         dto.externalId,
+        normalizedInput,
       );
 
-      if (existing !== null) {
-        if (existing.deletedAt === null) {
+      if (reactivated !== null) {
+        this.logger.log(
+          `create reactivated code=${LOG_CODE_MOVIE_REACTIVATED} id=${reactivated.id} externalId=${dto.externalId}`,
+        );
+        return {
+          status: 200,
+          movie: this.toResponseDto(reactivated, DETAIL_INCLUDE_ATTRIBUTES),
+        };
+      }
+
+      try {
+        const created = await this.repository.createManual(normalizedInput);
+        this.logger.log(
+          `create code=${LOG_CODE_MOVIE_CREATED} id=${created.id} externalId=${dto.externalId}`,
+        );
+        return {
+          status: 201,
+          movie: this.toResponseDto(created, DETAIL_INCLUDE_ATTRIBUTES),
+        };
+      } catch (error) {
+        if (this.isUniqueViolation(error)) {
           this.logger.warn(
             `create conflict code=${LOG_CODE_MOVIE_CONFLICT} externalId=${dto.externalId}`,
           );
@@ -97,28 +118,7 @@ export class MoviesService {
             details: null,
           });
         }
-
-        const reactivated = await this.repository.reactivateAndReplace(
-          Number(existing.id),
-          normalizedInput,
-        );
-
-        if (reactivated === null) {
-          throw new ConflictException({
-            error: 'Conflict',
-            message: `Movie with external_id '${dto.externalId}' is in an inconsistent state`,
-            details: null,
-          });
-        }
-
-        this.logger.log(
-          `create reactivated code=${LOG_CODE_MOVIE_REACTIVATED} id=${reactivated.id} externalId=${dto.externalId}`,
-        );
-
-        return {
-          status: 200,
-          movie: this.toResponseDto(reactivated, DETAIL_INCLUDE_ATTRIBUTES),
-        };
+        throw error;
       }
     }
 
@@ -132,7 +132,12 @@ export class MoviesService {
   }
 
   async update(id: number, dto: UpdateMovieDto): Promise<MovieResponseDto> {
-    const updated = await this.repository.updateActive(id, dto);
+    const normalized: UpdateMovieDto = {
+      ...dto,
+      openingCrawl: dto.openingCrawl === '' ? null : dto.openingCrawl,
+    };
+
+    const updated = await this.repository.updateActive(id, normalized);
 
     if (updated === null) {
       this.logger.warn(`update not found code=${LOG_CODE_MOVIE_NOT_FOUND} id=${id}`);
@@ -157,6 +162,14 @@ export class MoviesService {
       });
     }
     this.logger.log(`delete code=${LOG_CODE_MOVIE_DELETED} id=${id}`);
+  }
+
+  private isUniqueViolation(error: unknown): boolean {
+    if (error instanceof QueryFailedError) {
+      const driverError = (error as unknown as { driverError?: { code?: unknown } }).driverError;
+      return driverError?.code === POSTGRES_UNIQUE_VIOLATION;
+    }
+    return false;
   }
 
   private toResponseDto(movie: Movie, includeAttributes: boolean): MovieResponseDto {

@@ -10,6 +10,9 @@ export class User extends BaseEntity {
   @Column({ type: 'varchar', length: 255, unique: true })
   email!: string;
 
+  @Column({ type: 'varchar', length: 100 })
+  name!: string;
+
   @Column({ type: 'varchar', length: 20, default: DEFAULT_USER_ROLE })
   role!: UserRole;
 

@@ -24,7 +24,7 @@ describe('AuthController', () => {
 
   it('delegates signup to the AuthService and returns void (Nest serializes as 204)', async () => {
     await buildModule();
-    const dto = { email: 'foo@bar.com', password: 'StrongP4ssw0rd#' };
+    const dto = { email: 'foo@bar.com', name: 'Foo Bar', password: 'StrongP4ssw0rd#' };
 
     const result = await controller.signup(dto);
 
@@ -34,7 +34,7 @@ describe('AuthController', () => {
 
   it('delegates login to the AuthService and returns the accessToken', async () => {
     await buildModule();
-    const dto = { email: 'foo@bar.com', password: 'StrongP4ssw0rd#' };
+    const dto = { email: 'foo@bar.com', name: 'Foo Bar', password: 'StrongP4ssw0rd#' };
 
     const result = await controller.login(dto);
 

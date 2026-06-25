@@ -1,4 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { QueryFailedError } from 'typeorm';
 import { Movie } from '../repository/movie.entity';
 import { FindMoviesQueryDto, SortBy, SortOrder } from '../controller/dto/find-movies-query.dto';
 import { MoviesRepository } from '../repository/movies.repository';
@@ -22,6 +23,11 @@ const buildMovie = (overrides: Partial<Movie> = {}): Movie =>
     ...overrides,
   }) as Movie;
 
+const buildUniqueViolation = (): QueryFailedError => {
+  const driverError = Object.assign(new Error('unique violation'), { code: '23505' });
+  return new QueryFailedError('insert', [], driverError);
+};
+
 const buildRepoMock = (): jest.Mocked<MoviesRepository> => {
   return {
     findAll: jest.fn().mockResolvedValue({ data: [], total: 0 }),
@@ -29,6 +35,7 @@ const buildRepoMock = (): jest.Mocked<MoviesRepository> => {
     findOneByProviderAndExternalId: jest.fn().mockResolvedValue(null),
     createManual: jest.fn().mockImplementation(async (input) => buildMovie({ ...input })),
     reactivateAndReplace: jest.fn().mockResolvedValue(null),
+    reactivateByExternalId: jest.fn().mockResolvedValue(null),
     updateActive: jest.fn().mockResolvedValue(null),
     softDelete: jest.fn().mockResolvedValue({ exists: false }),
   } as unknown as jest.Mocked<MoviesRepository>;
@@ -128,10 +135,10 @@ describe('MoviesService', () => {
 
       expect(result.status).toBe(201);
       expect(result.movie.title).toBe('New Movie');
-      expect(repo.findOneByProviderAndExternalId).not.toHaveBeenCalled();
+      expect(repo.reactivateByExternalId).not.toHaveBeenCalled();
     });
 
-    it('inserts when externalId is provided but not found (201)', async () => {
+    it('inserts when externalId is provided but not found (201, UPDATE-then-INSERT)', async () => {
       const dto = {
         title: 'New Movie',
         director: 'D',
@@ -139,18 +146,21 @@ describe('MoviesService', () => {
         releaseDate: '2025-01-01',
         externalId: 'abc',
       };
-      repo.findOneByProviderAndExternalId.mockResolvedValue(null);
+      repo.reactivateByExternalId.mockResolvedValue(null);
       const created = buildMovie({ externalId: 'abc' });
       repo.createManual.mockResolvedValue(created);
 
       const result = await service.create(dto);
 
+      expect(repo.reactivateByExternalId).toHaveBeenCalledWith('abc', expect.anything());
+      expect(repo.createManual).toHaveBeenCalledWith(expect.objectContaining({ externalId: 'abc' }));
       expect(result.status).toBe(201);
+      expect(result.movie.externalId).toBe('abc');
     });
 
-    it('throws 409 when externalId matches an active movie', async () => {
-      const existing = buildMovie({ externalId: 'abc', deletedAt: null });
-      repo.findOneByProviderAndExternalId.mockResolvedValue(existing);
+    it('throws 409 when externalId matches an active movie (UNIQUE violation on INSERT)', async () => {
+      repo.reactivateByExternalId.mockResolvedValue(null);
+      repo.createManual.mockRejectedValue(buildUniqueViolation());
 
       const dto = {
         title: 'T',
@@ -160,15 +170,11 @@ describe('MoviesService', () => {
         externalId: 'abc',
       };
       await expect(service.create(dto)).rejects.toBeInstanceOf(ConflictException);
-      expect(repo.createManual).not.toHaveBeenCalled();
     });
 
     it('reactivates when externalId matches a soft-deleted movie (200)', async () => {
-      const softDeleted = buildMovie({ externalId: 'abc', deletedAt: new Date() });
-      repo.findOneByProviderAndExternalId.mockResolvedValue(softDeleted);
-
       const reactivated = buildMovie({ externalId: 'abc', deletedAt: null });
-      repo.reactivateAndReplace.mockResolvedValue(reactivated);
+      repo.reactivateByExternalId.mockResolvedValue(reactivated);
 
       const dto = {
         title: 'Updated',
@@ -180,9 +186,10 @@ describe('MoviesService', () => {
 
       const result = await service.create(dto);
 
+      expect(repo.reactivateByExternalId).toHaveBeenCalledWith('abc', expect.anything());
+      expect(repo.createManual).not.toHaveBeenCalled();
       expect(result.status).toBe(200);
       expect(result.movie.externalId).toBe('abc');
-      expect(repo.createManual).not.toHaveBeenCalled();
     });
 
     it('normalizes undefined optional fields to null (PUT pura)', async () => {
@@ -200,6 +207,20 @@ describe('MoviesService', () => {
       expect(input?.openingCrawl).toBeNull();
       expect(input?.externalId).toBeNull();
       expect(input?.attributes).toEqual({});
+    });
+
+    it('rethrows non-unique DB errors (e.g. connection lost) without swallowing them', async () => {
+      repo.reactivateByExternalId.mockResolvedValue(null);
+      repo.createManual.mockRejectedValue(new Error('connection lost'));
+
+      const dto = {
+        title: 'T',
+        director: 'D',
+        producer: 'P',
+        releaseDate: '2025-01-01',
+        externalId: 'abc',
+      };
+      await expect(service.create(dto)).rejects.toThrow('connection lost');
     });
   });
 

@@ -5,10 +5,13 @@ import {
   IsInt,
   IsNotEmpty,
   IsString,
+  Matches,
   Max,
   Min,
   MinLength,
-  validateOrReject,
+  ValidationError,
+  validate,
+  validateSync,
 } from 'class-validator';
 
 export enum NodeEnv {
@@ -17,9 +20,9 @@ export enum NodeEnv {
   Test = 'test',
 }
 
-const PRODUCTION_JWT_SECRET_MIN_LENGTH = 32;
-const PRODUCTION_DATABASE_PASSWORD_MIN_LENGTH = 12;
-const PRODUCTION_BCRYPT_COST_MIN = 10;
+const PRODUCTION_GROUP = 'production';
+const DEFAULT_GROUP = 'default';
+
 const TRIVIAL_DATABASE_PASSWORD_SUBSTRINGS: readonly string[] = [
   'postgres',
   'password',
@@ -28,10 +31,13 @@ const TRIVIAL_DATABASE_PASSWORD_SUBSTRINGS: readonly string[] = [
   'secret',
 ];
 
-const isTrivialDatabasePassword = (value: string): boolean => {
-  const lower = value.toLowerCase();
-  return TRIVIAL_DATABASE_PASSWORD_SUBSTRINGS.some((needle) => lower.includes(needle));
-};
+const escapeRegex = (s: string): string =>
+  s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const TRIVIAL_PASSWORD_PATTERN = new RegExp(
+  `^(?!.*(?:${TRIVIAL_DATABASE_PASSWORD_SUBSTRINGS.map(escapeRegex).join('|')})).+$`,
+  'i',
+);
 
 export class EnvVars {
   @IsEnum(NodeEnv)
@@ -57,6 +63,14 @@ export class EnvVars {
 
   @IsString()
   @IsNotEmpty()
+  @MinLength(12, {
+    groups: [PRODUCTION_GROUP],
+    message: 'DATABASE_PASSWORD must be at least 12 characters in production',
+  })
+  @Matches(TRIVIAL_PASSWORD_PATTERN, {
+    groups: [PRODUCTION_GROUP],
+    message: `DATABASE_PASSWORD must not contain forbidden substrings: ${TRIVIAL_DATABASE_PASSWORD_SUBSTRINGS.join(', ')}`,
+  })
   DATABASE_PASSWORD!: string;
 
   @IsString()
@@ -64,7 +78,15 @@ export class EnvVars {
   DATABASE_NAME: string = 'movies_db';
 
   @IsString()
-  @MinLength(16)
+  @IsNotEmpty()
+  @MinLength(16, {
+    groups: [DEFAULT_GROUP],
+    message: 'JWT_SECRET must be at least 16 characters',
+  })
+  @MinLength(32, {
+    groups: [PRODUCTION_GROUP],
+    message: 'JWT_SECRET must be at least 32 characters in production',
+  })
   JWT_SECRET!: string;
 
   @IsInt()
@@ -74,65 +96,64 @@ export class EnvVars {
   @IsInt()
   @Min(4)
   @Max(15)
+  @Min(10, {
+    groups: [PRODUCTION_GROUP],
+    message: 'BCRYPT_COST must be at least 10 in production',
+  })
   BCRYPT_COST: number = 10;
 }
 
-function assertProductionHardening(env: EnvVars): void {
-  const problems: string[] = [];
+const SHARED_VALIDATE_OPTIONS = {
+  whitelist: true,
+  forbidNonWhitelisted: false,
+  always: true,
+  strictGroups: true,
+} as const;
 
-  if (env.JWT_SECRET === undefined || env.JWT_SECRET.length < PRODUCTION_JWT_SECRET_MIN_LENGTH) {
-    const actualLength = env.JWT_SECRET?.length ?? 0;
-    problems.push(
-      `JWT_SECRET must be at least ${PRODUCTION_JWT_SECRET_MIN_LENGTH} characters in production (got ${actualLength})`,
-    );
-  }
-
-  if (
-    env.DATABASE_PASSWORD === undefined ||
-    env.DATABASE_PASSWORD.length < PRODUCTION_DATABASE_PASSWORD_MIN_LENGTH
-  ) {
-    const actualLength = env.DATABASE_PASSWORD?.length ?? 0;
-    problems.push(
-      `DATABASE_PASSWORD must be at least ${PRODUCTION_DATABASE_PASSWORD_MIN_LENGTH} characters in production (got ${actualLength})`,
-    );
-  }
-  if (env.DATABASE_PASSWORD !== undefined && isTrivialDatabasePassword(env.DATABASE_PASSWORD)) {
-    problems.push(`DATABASE_PASSWORD is a trivial value and is not allowed in production`);
-  }
-
-  if (env.BCRYPT_COST === undefined || env.BCRYPT_COST < PRODUCTION_BCRYPT_COST_MIN) {
-    const actual = env.BCRYPT_COST ?? 0;
-    problems.push(
-      `BCRYPT_COST must be at least ${PRODUCTION_BCRYPT_COST_MIN} in production (got ${actual})`,
-    );
-  }
-
-  if (problems.length > 0) {
-    throw new Error(
-      `Cannot boot in production without proper secrets. Check JWT_SECRET, DATABASE_PASSWORD. ${problems.join('; ')}`,
-    );
-  }
-}
-
-export function assertProductionHardeningSync(rawConfig: Record<string, unknown>): void {
-  const env = plainToInstance(EnvVars, rawConfig, { enableImplicitConversion: true });
-  if (env.NODE_ENV === NodeEnv.Production) {
-    assertProductionHardening(env);
-  }
-}
+const groupsFor = (env: EnvVars): string[] =>
+  env.NODE_ENV === NodeEnv.Production ? [PRODUCTION_GROUP] : [DEFAULT_GROUP];
 
 export async function validateEnv(
   rawConfig: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const validated = plainToInstance(EnvVars, rawConfig, { enableImplicitConversion: true });
-  await validateOrReject(validated, {
-    whitelist: true,
-    forbidNonWhitelisted: false,
+  // eslint-disable-next-line no-console
+  console.error('DBG validateEnv called with', Object.keys(rawConfig).length, 'keys, DATABASE_PASSWORD=', rawConfig.DATABASE_PASSWORD);
+  const validated = plainToInstance(EnvVars, rawConfig, {
+    enableImplicitConversion: true,
   });
-
-  if (validated.NODE_ENV === NodeEnv.Production) {
-    assertProductionHardening(validated);
+  const errors = await validate(validated, {
+    ...SHARED_VALIDATE_OPTIONS,
+    groups: groupsFor(validated),
+  });
+  if (errors.length > 0) {
+    throw new Error(formatValidationErrors(errors));
   }
-
+  // eslint-disable-next-line no-console
+  console.error('DBG validateEnv returning rawConfig with', Object.keys(rawConfig).length, 'keys, DATABASE_PASSWORD=', rawConfig.DATABASE_PASSWORD);
   return rawConfig;
+}
+
+export function validateEnvSync(
+  rawConfig: Record<string, unknown>,
+): Record<string, unknown> {
+  const validated = plainToInstance(EnvVars, rawConfig, {
+    enableImplicitConversion: true,
+  });
+  const errors = validateSync(validated, {
+    ...SHARED_VALIDATE_OPTIONS,
+    groups: groupsFor(validated),
+  });
+  if (errors.length > 0) {
+    throw new Error(formatValidationErrors(errors));
+  }
+  return rawConfig;
+}
+
+function formatValidationErrors(errors: ValidationError[]): string {
+  return errors
+    .map((error) => {
+      const constraints = Object.values(error.constraints ?? {});
+      return constraints.join(', ');
+    })
+    .join('; ');
 }

@@ -10,8 +10,8 @@ import {
   Max,
   MaxLength,
   Min,
+  MinLength,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
 
 const RELEASE_DATE_FORMAT_EXAMPLE = '1977-05-25';
 const MAX_TITLE_LENGTH = 200;
@@ -29,7 +29,6 @@ export class CreateMovieDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(MAX_TITLE_LENGTH)
-  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   title!: string;
 
   @ApiProperty({
@@ -40,7 +39,6 @@ export class CreateMovieDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(MAX_DIRECTOR_LENGTH)
-  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   director!: string;
 
   @ApiProperty({
@@ -51,7 +49,6 @@ export class CreateMovieDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(MAX_PRODUCER_LENGTH)
-  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   producer!: string;
 
   @ApiProperty({
@@ -100,6 +97,7 @@ export class CreateMovieDto {
   })
   @IsOptional()
   @IsString()
+  @MinLength(1)
   @MaxLength(MAX_EXTERNAL_ID_LENGTH)
   externalId?: string;
 
